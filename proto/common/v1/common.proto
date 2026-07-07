@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package common.v1;
+
+option go_package = "github.com/jone-code/SentinelHub/pkg/gen/common/v1;commonv1";
+
+// TenantScope identifies the tenant for multi-tenant operations.
+message TenantScope {
+  string tenant_id = 1;
+}
+
+// Pagination request parameters.
+message Pagination {
+  int32 page = 1;
+  int32 page_size = 2;
+  string sort = 3;
+}
+
+// Pagination metadata in responses.
+message PageInfo {
+  int64 total = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+}

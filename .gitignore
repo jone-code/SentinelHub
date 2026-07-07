@@ -1,0 +1,49 @@
+# Binaries
+/bin/
+/dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+/vendor/
+*.test
+*.out
+coverage.out
+
+# Node
+node_modules/
+console/dist/
+console/.vite/
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Docker
+deploy/docker-compose/data/
+
+# Build artifacts
+agent/build/
+*.pkg
+*.deb
+*.rpm
+
+# Secrets
+*.pem
+*.key
+!deploy/certs/.gitkeep
+
+# OS
+Thumbs.db

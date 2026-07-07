@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package device.v1;
+
+option go_package = "github.com/jone-code/SentinelHub/pkg/gen/device/v1;devicev1";
+
+import "common/v1/common.proto";
+
+// Device represents a managed endpoint.
+message Device {
+  string id = 1;
+  string tenant_id = 2;
+  string agent_id = 3;
+  string hostname = 4;
+  string os_type = 5;
+  string os_version = 6;
+  string status = 7;
+  int32 compliance_score = 8;
+  int32 trust_score = 9;
+}
+
+service DeviceService {
+  rpc GetDevice(GetDeviceRequest) returns (Device);
+  rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+}
+
+message GetDeviceRequest {
+  common.v1.TenantScope tenant = 1;
+  string device_id = 2;
+}
+
+message ListDevicesRequest {
+  common.v1.TenantScope tenant = 1;
+  common.v1.Pagination pagination = 2;
+  string status = 3;
+}
+
+message ListDevicesResponse {
+  repeated Device devices = 1;
+  common.v1.PageInfo page_info = 2;
+}
