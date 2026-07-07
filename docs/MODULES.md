@@ -23,7 +23,7 @@
 
 ## 技术栈
 
-- **后端**：Java 21 + Spring Boot 3.3 + Gradle 多模块
+- **后端**：Java 21 + Spring Boot 3.3 + Maven 多模块
 - **Agent**：Go 1.22+（跨平台终端）
 - **前端**：React 18 + TypeScript + Ant Design
 

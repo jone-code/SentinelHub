@@ -8,7 +8,7 @@ Spring Boot 微服务 — 骨架阶段，待按路线图实现业务逻辑。
 
 ```bash
 cd backend
-./gradlew :asset:bootRun
+mvn -pl asset spring-boot:run
 ```
 
 ## 健康检查

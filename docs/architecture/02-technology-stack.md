@@ -26,7 +26,7 @@
 │ 身份认证     │ Spring Security + OAuth2/OIDC (Keycloak 可插拔)      │
 │ 可观测       │ Micrometer, Prometheus, Grafana, Loki              │
 │ 容器编排     │ Docker, Kubernetes (Helm)                          │
-│ 构建工具     │ Gradle 8 (Kotlin DSL), Maven BOM                   │
+│ 构建工具     │ Maven 3.9, Spring Boot BOM                         │
 │ CI/CD        │ GitHub Actions                                     │
 └─────────────┴──────────────────────────────────────────────────┘
 ```
@@ -37,7 +37,7 @@
 
 - **Spring Boot 3.3**：成熟的企业级框架，生态完善，适合中大型安全平台
 - **Java 21**：LTS 版本，虚拟线程（Project Loom）适合高并发网关与事件消费
-- **Gradle 多模块**：`backend/` 下按域拆分模块，统一依赖版本管理
+- **Maven 多模块**：`backend/` 下按域拆分模块，父 POM 统一依赖版本管理
 - **MyBatis-Plus**：灵活 SQL 控制，适合复杂查询（设备、审计、资产）
 - **Spring Security**：RBAC、OAuth2、方法级权限
 
@@ -45,8 +45,7 @@
 
 ```
 backend/
-├── build.gradle.kts          # 根构建脚本
-├── settings.gradle.kts       # 模块声明
+├── pom.xml                   # 父 POM（Spring Boot BOM）
 ├── common/                   # 公共 DTO、审计模型、租户上下文
 ├── gateway/                  # API 网关 (:8080)
 ├── identity/                 # 身份租户 (:8081)
@@ -132,9 +131,9 @@ agent/
 
 ## 6. 开发工具链
 
-- **构建**：Gradle Wrapper (`backend/gradlew`)
+- **构建**：Maven Wrapper (`backend/mvnw`)
 - **API 文档**：springdoc-openapi (Swagger UI)
-- **Proto 生成**：protobuf-gradle-plugin
+- **Proto 生成**：protobuf-maven-plugin
 - **代码规范**：Checkstyle, SpotBugs, ESLint (前端)
 - **数据库迁移**：Flyway
-- **本地开发**：docker-compose + `./gradlew :gateway:bootRun`
+- **本地开发**：docker-compose + `mvn -pl gateway spring-boot:run`

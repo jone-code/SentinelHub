@@ -1,10 +1,15 @@
 # Java
-backend/.gradle/
-backend/**/build/
-backend/**/out/
+backend/target/
+backend/**/target/
 *.class
 *.jar
-!backend/gradle/wrapper/gradle-wrapper.jar
+!backend/.mvn/wrapper/maven-wrapper.jar
+
+# Maven
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+release.properties
 
 # Go (Agent only)
 /bin/

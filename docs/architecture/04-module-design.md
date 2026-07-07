@@ -325,7 +325,7 @@ graph LR
 
 ## 7. 模块开发规范
 
-1. 每个服务为 `backend/` 下独立 Gradle 子模块，共享 `common` 公共库
+1. 每个服务为 `backend/` 下独立 Maven 子模块，共享 `sentinel-common` 公共库
 2. 服务间 **禁止** 直接读对方数据库，仅通过 gRPC / OpenFeign / NATS
 3. 新增模块必须：proto 定义、OpenAPI 片段、Flyway 迁移、README
 4. 所有写操作产生审计事件，格式见 `com.sentinelhub.common.audit.AuditEvent`

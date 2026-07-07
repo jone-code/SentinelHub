@@ -8,7 +8,7 @@ Spring Boot 微服务 — 骨架阶段，待按路线图实现业务逻辑。
 
 ```bash
 cd backend
-./gradlew :zerotrust:bootRun
+mvn -pl zerotrust spring-boot:run
 ```
 
 ## 健康检查

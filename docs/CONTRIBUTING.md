@@ -17,7 +17,7 @@
 
 ```
 backend/{module}/
-├── build.gradle.kts
+├── pom.xml
 ├── src/main/java/com/sentinelhub/{module}/
 │   ├── {Module}Application.java    # Spring Boot 入口
 │   ├── config/                     # 配置类
@@ -64,6 +64,6 @@ docs(architecture): update NAC integration diagram
 
 ```bash
 cd backend
-./gradlew :gateway:bootRun
-./gradlew :device:bootRun
+./mvnw -pl gateway spring-boot:run
+./mvnw -pl device spring-boot:run
 ```

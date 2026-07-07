@@ -23,7 +23,7 @@
 
 | 层级 | 技术 |
 |------|------|
-| 后端 | Java 21, Spring Boot 3.3, Gradle, MyBatis-Plus |
+| 后端 | Java 21, Spring Boot 3.3, Maven, MyBatis-Plus |
 | 前端 | React 18, TypeScript, Ant Design |
 | Agent | Go 1.22+（跨平台终端） |
 | 存储 | PostgreSQL, Redis, ClickHouse, MinIO |
@@ -66,10 +66,10 @@ SentinelHub/
 make dev-up
 
 # 构建后端
-cd backend && ./gradlew build
+cd backend && ./mvnw clean package
 
 # 启动网关
-./gradlew :gateway:bootRun
+./mvnw -pl gateway spring-boot:run
 
 # 启动控制台
 cd console && npm install && npm run dev

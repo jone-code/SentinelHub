@@ -1,6 +1,6 @@
 # SentinelHub Backend
 
-Java 21 + Spring Boot 3.3 多模块后端。
+Java 21 + Spring Boot 3.3 多模块后端（Maven）。
 
 ## 模块列表
 
@@ -24,15 +24,17 @@ Java 21 + Spring Boot 3.3 多模块后端。
 ## 构建
 
 ```bash
-./gradlew build
+mvn clean package
+# 或使用 Maven Wrapper
+./mvnw clean package
 ```
 
 ## 运行
 
 ```bash
 # 启动单个服务
-./gradlew :gateway:bootRun
-./gradlew :device:bootRun
+mvn -pl gateway spring-boot:run
+mvn -pl device spring-boot:run
 
 # 健康检查
 curl http://localhost:8080/health
@@ -40,8 +42,18 @@ curl http://localhost:8080/health
 
 ## 公共库
 
-`common` 模块提供：
+`common` 模块（`sentinel-common`）提供：
 - `ApiResponse` / `PageResponse` — 统一 API 响应
 - `TenantContext` — 多租户上下文
 - `AuditEvent` — 审计事件模型
 - `HealthController` — 健康检查端点
+
+## 项目结构
+
+```
+backend/
+├── pom.xml                 # 父 POM（依赖版本管理）
+├── common/pom.xml          # 公共库
+├── gateway/pom.xml         # 各业务微服务
+└── ...
+```
