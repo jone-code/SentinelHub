@@ -1,19 +1,24 @@
 services:
-  postgres:
-    image: postgres:16-alpine
+  mysql:
+    image: mysql:8.4
     environment:
-      POSTGRES_USER: sentinel
-      POSTGRES_PASSWORD: sentinel
-      POSTGRES_DB: sentinelhub
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sentinelhub
+      MYSQL_USER: sentinel
+      MYSQL_PASSWORD: sentinel
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-authentication-plugin=mysql_native_password
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sentinel"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-usentinel", "-psentinel"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -53,6 +58,6 @@ services:
       - minio_data:/data
 
 volumes:
-  postgres_data:
+  mysql_data:
   clickhouse_data:
   minio_data:

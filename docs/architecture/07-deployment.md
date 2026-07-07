@@ -15,7 +15,7 @@
 ```yaml
 # 服务组件
 services:
-  - postgres
+  - mysql
   - redis
   - nats
   - clickhouse
@@ -37,7 +37,7 @@ make backend-run      # 启动 API 服务
 |------|------|
 | sentinel-server | 8080 |
 | Console | 3000 |
-| PostgreSQL | 5432 |
+| MySQL | 3306 |
 | Redis | 6379 |
 | NATS | 4222 |
 | ClickHouse HTTP | 8123 |
@@ -53,10 +53,7 @@ deploy/helm/sentinelhub/
 ├── values.yaml
 ├── values-prod.yaml
 └── templates/
-    ├── gateway/
-    ├── identity/
-    ├── device/
-    ├── ...
+    ├── server/           # 统一 API 服务
     ├── ingress.yaml
     └── secrets.yaml
 ```
@@ -74,31 +71,31 @@ sentinelhub-data      # 有状态组件（可选独立）
 # 控制台
 console.sentinel.example.com → console
 
-# API
-api.sentinel.example.com → gateway
+# API（admin + app + agent 统一入口）
+api.sentinel.example.com → sentinel-server
+  /api/admin/v1  → 管理端
+  /api/app/v1    → 移动端
+  /agent/v1      → PC 终端
 
-# Agent 接入（可独立域名）
-agent.sentinel.example.com → gateway (/agent/*)
+# Agent 可选独立域名
+agent.sentinel.example.com → sentinel-server (/agent/*)
 ```
 
 ### 3.4 资源建议（生产最小）
 
 | 组件 | replicas | CPU | Memory |
 |------|----------|-----|--------|
-| gateway | 2 | 500m | 512Mi |
-| identity | 2 | 250m | 256Mi |
-| device | 2 | 500m | 512Mi |
-| policy | 2 | 500m | 512Mi |
-| audit | 2 | 500m | 1Gi |
-| 其他业务服务 | 1-2 | 250m | 256Mi |
+| sentinel-server | 2 | 1000m | 1Gi |
+| console | 2 | 100m | 128Mi |
 
 ## 4. 有状态组件
 
-### PostgreSQL
+### MySQL
 
-- 生产：云 RDS 或 Patroni 主从
-- 连接池：PgBouncer（sidecar 或独立）
-- 备份：每日全量 + WAL 归档
+- 生产：主从复制或云 RDS（MySQL 8.4）
+- 字符集：`utf8mb4_unicode_ci`
+- 连接池：HikariCP（Spring Boot 内置）
+- 备份：每日全量 + binlog 归档
 
 ### ClickHouse
 

@@ -1,5 +1,7 @@
 # 核心数据模型
 
+> **数据库**：MySQL 8.4，字符集 `utf8mb4`，引擎 `InnoDB`。主键使用 `CHAR(36)` 存储 UUID。
+
 ## 1. ER 关系概览
 
 ```mermaid
@@ -32,10 +34,10 @@ erDiagram
 所有租户级表包含：
 
 ```sql
-tenant_id    UUID NOT NULL,
-created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-deleted_at   TIMESTAMPTZ NULL  -- 软删除
+tenant_id    CHAR(36)    NOT NULL,
+created_at   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+updated_at   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+deleted_at   DATETIME(3) NULL  -- 软删除
 ```
 
 ## 3. 核心表定义
@@ -45,182 +47,178 @@ deleted_at   TIMESTAMPTZ NULL  -- 软删除
 ```sql
 -- 租户
 CREATE TABLE tenants (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id          CHAR(36)     PRIMARY KEY DEFAULT (UUID()),
     name        VARCHAR(128) NOT NULL,
-    slug        VARCHAR(64) UNIQUE NOT NULL,
-    status      VARCHAR(16) NOT NULL DEFAULT 'active',
-    settings    JSONB NOT NULL DEFAULT '{}',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+    slug        VARCHAR(64)  NOT NULL,
+    status      VARCHAR(16)  NOT NULL DEFAULT 'active',
+    settings    JSON         NOT NULL DEFAULT (JSON_OBJECT()),
+    created_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_tenants_slug (slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 组织单元（树形）
+-- 组织单元（树形，物化路径）
 CREATE TABLE org_units (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id   UUID NOT NULL REFERENCES tenants(id),
-    parent_id   UUID REFERENCES org_units(id),
+    id          CHAR(36)     PRIMARY KEY DEFAULT (UUID()),
+    tenant_id   CHAR(36)     NOT NULL,
+    parent_id   CHAR(36)     NULL,
     name        VARCHAR(128) NOT NULL,
-    path        LTREE NOT NULL,  -- 物化路径，便于子树查询
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+    path        VARCHAR(512) NOT NULL,  -- 如 /root_id/dept_id/
+    created_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    KEY idx_org_units_tenant_path (tenant_id, path),
+    CONSTRAINT fk_org_units_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 用户
 CREATE TABLE users (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id   UUID NOT NULL REFERENCES tenants(id),
-    org_unit_id UUID REFERENCES org_units(id),
+    id          CHAR(36)     PRIMARY KEY DEFAULT (UUID()),
+    tenant_id   CHAR(36)     NOT NULL,
+    org_unit_id CHAR(36)     NULL,
     email       VARCHAR(256) NOT NULL,
     name        VARCHAR(128) NOT NULL,
-    status      VARCHAR(16) NOT NULL DEFAULT 'active',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, email)
-);
+    status      VARCHAR(16)  NOT NULL DEFAULT 'active',
+    created_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_users_tenant_email (tenant_id, email),
+    CONSTRAINT fk_users_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 角色与权限（RBAC）
 CREATE TABLE roles (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id   UUID NOT NULL REFERENCES tenants(id),
-    name        VARCHAR(64) NOT NULL,
-    permissions JSONB NOT NULL DEFAULT '[]',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, name)
-);
+    id          CHAR(36)     PRIMARY KEY DEFAULT (UUID()),
+    tenant_id   CHAR(36)     NOT NULL,
+    name        VARCHAR(64)  NOT NULL,
+    permissions JSON         NOT NULL DEFAULT (JSON_ARRAY()),
+    created_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_roles_tenant_name (tenant_id, name),
+    CONSTRAINT fk_roles_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 授权许可
 CREATE TABLE licenses (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id       UUID NOT NULL UNIQUE REFERENCES tenants(id),
-    max_devices     INT NOT NULL DEFAULT 100,
-    enabled_modules JSONB NOT NULL DEFAULT '["device","asset","audit"]',
-    expires_at      TIMESTAMPTZ,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+    id              CHAR(36)     PRIMARY KEY DEFAULT (UUID()),
+    tenant_id       CHAR(36)     NOT NULL,
+    max_devices     INT          NOT NULL DEFAULT 100,
+    enabled_modules JSON         NOT NULL DEFAULT (JSON_ARRAY('device','asset','audit')),
+    expires_at      DATETIME(3)  NULL,
+    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_licenses_tenant (tenant_id),
+    CONSTRAINT fk_licenses_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
 ### 3.2 设备与分组
 
 ```sql
 CREATE TABLE devices (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id       UUID NOT NULL REFERENCES tenants(id),
-    org_unit_id     UUID REFERENCES org_units(id),
-    agent_id        VARCHAR(64) NOT NULL,          -- Agent 实例 ID
-    hostname        VARCHAR(256),
-    os_type         VARCHAR(16) NOT NULL,          -- windows|darwin|linux|ios|android
-    os_version      VARCHAR(64),
-    hardware_id     VARCHAR(128) NOT NULL,         -- 设备指纹
-    status          VARCHAR(16) NOT NULL DEFAULT 'pending',  -- pending|active|offline|revoked
-    last_seen_at    TIMESTAMPTZ,
-    compliance_score SMALLINT,                     -- 0-100
-    trust_score     SMALLINT,                      -- 零信任信任分
-    metadata        JSONB NOT NULL DEFAULT '{}',
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, agent_id)
-);
-
-CREATE INDEX idx_devices_tenant_status ON devices(tenant_id, status);
-CREATE INDEX idx_devices_last_seen ON devices(tenant_id, last_seen_at);
-
-CREATE TABLE device_groups (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id   UUID NOT NULL REFERENCES tenants(id),
-    name        VARCHAR(128) NOT NULL,
-    description TEXT,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, name)
-);
-
-CREATE TABLE device_group_members (
-    device_id       UUID NOT NULL REFERENCES devices(id),
-    device_group_id UUID NOT NULL REFERENCES device_groups(id),
-    PRIMARY KEY (device_id, device_group_id)
-);
+    id              CHAR(36)     PRIMARY KEY DEFAULT (UUID()),
+    tenant_id       CHAR(36)     NOT NULL,
+    org_unit_id     CHAR(36)     NULL,
+    agent_id        VARCHAR(64)  NOT NULL,
+    hostname        VARCHAR(256) NULL,
+    os_type         VARCHAR(16)  NOT NULL,
+    os_version      VARCHAR(64)  NULL,
+    hardware_id     VARCHAR(128) NOT NULL,
+    status          VARCHAR(16)  NOT NULL DEFAULT 'pending',
+    last_seen_at    DATETIME(3)  NULL,
+    compliance_score SMALLINT    NULL,
+    trust_score     SMALLINT     NULL,
+    metadata        JSON         NOT NULL DEFAULT (JSON_OBJECT()),
+    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_devices_tenant_agent (tenant_id, agent_id),
+    KEY idx_devices_tenant_status (tenant_id, status),
+    KEY idx_devices_last_seen (tenant_id, last_seen_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
 ### 3.3 资产
 
 ```sql
 CREATE TABLE asset_hardware (
-    device_id   UUID PRIMARY KEY REFERENCES devices(id),
-    tenant_id   UUID NOT NULL,
-    cpu         JSONB,
-    memory_mb   INT,
-    disks       JSONB,
-    nics        JSONB,
-    collected_at TIMESTAMPTZ NOT NULL,
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+    device_id    CHAR(36)     PRIMARY KEY,
+    tenant_id    CHAR(36)     NOT NULL,
+    cpu          JSON         NULL,
+    memory_mb    INT          NULL,
+    disks        JSON         NULL,
+    nics         JSON         NULL,
+    collected_at DATETIME(3)  NOT NULL,
+    updated_at   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    CONSTRAINT fk_asset_hardware_device FOREIGN KEY (device_id) REFERENCES devices(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE asset_software (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    device_id   UUID NOT NULL REFERENCES devices(id),
-    tenant_id   UUID NOT NULL,
-    name        VARCHAR(256) NOT NULL,
-    version     VARCHAR(128),
-    publisher   VARCHAR(256),
-    install_path TEXT,
-    collected_at TIMESTAMPTZ NOT NULL,
-    UNIQUE (device_id, name, version)
-);
-
-CREATE INDEX idx_asset_software_tenant ON asset_software(tenant_id, name);
+    id           CHAR(36)     PRIMARY KEY DEFAULT (UUID()),
+    device_id    CHAR(36)     NOT NULL,
+    tenant_id    CHAR(36)     NOT NULL,
+    name         VARCHAR(256) NOT NULL,
+    version      VARCHAR(128) NULL,
+    publisher    VARCHAR(256) NULL,
+    install_path TEXT         NULL,
+    collected_at DATETIME(3)  NOT NULL,
+    UNIQUE KEY uk_asset_software (device_id, name, version),
+    KEY idx_asset_software_tenant (tenant_id, name),
+    CONSTRAINT fk_asset_software_device FOREIGN KEY (device_id) REFERENCES devices(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
 ### 3.4 策略
 
 ```sql
 CREATE TABLE policies (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id   UUID NOT NULL REFERENCES tenants(id),
+    id          CHAR(36)     PRIMARY KEY DEFAULT (UUID()),
+    tenant_id   CHAR(36)     NOT NULL,
     name        VARCHAR(128) NOT NULL,
-    type        VARCHAR(32) NOT NULL,              -- software|dlp|nac|...
-    status      VARCHAR(16) NOT NULL DEFAULT 'draft',  -- draft|published|archived
-    priority    INT NOT NULL DEFAULT 100,
-    scope       JSONB NOT NULL DEFAULT '{}',       -- org_unit_ids, device_group_ids, device_ids
-    created_by  UUID REFERENCES users(id),
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+    type        VARCHAR(32)  NOT NULL,
+    status      VARCHAR(16)  NOT NULL DEFAULT 'draft',
+    priority    INT          NOT NULL DEFAULT 100,
+    scope       JSON         NOT NULL DEFAULT (JSON_OBJECT()),
+    created_by  CHAR(36)     NULL,
+    created_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    CONSTRAINT fk_policies_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE policy_versions (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    policy_id   UUID NOT NULL REFERENCES policies(id),
-    version     INT NOT NULL,
-    content     JSONB NOT NULL,                    -- 策略 DSL JSON
-    published_at TIMESTAMPTZ,
-    published_by UUID REFERENCES users(id),
-    UNIQUE (policy_id, version)
-);
+    id           CHAR(36)     PRIMARY KEY DEFAULT (UUID()),
+    policy_id    CHAR(36)     NOT NULL,
+    version      INT          NOT NULL,
+    content      JSON         NOT NULL,
+    published_at DATETIME(3)  NULL,
+    published_by CHAR(36)     NULL,
+    UNIQUE KEY uk_policy_versions (policy_id, version),
+    CONSTRAINT fk_policy_versions_policy FOREIGN KEY (policy_id) REFERENCES policies(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
 ### 3.5 合规
 
 ```sql
 CREATE TABLE compliance_baselines (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id   UUID NOT NULL REFERENCES tenants(id),
+    id          CHAR(36)     PRIMARY KEY DEFAULT (UUID()),
+    tenant_id   CHAR(36)     NOT NULL,
     name        VARCHAR(128) NOT NULL,
-    framework   VARCHAR(32),                       -- cis|djbh|custom
-    rules       JSONB NOT NULL,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+    framework   VARCHAR(32)  NULL,
+    rules       JSON         NOT NULL,
+    created_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    CONSTRAINT fk_compliance_baselines_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE compliance_results (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id   UUID NOT NULL,
-    device_id   UUID NOT NULL REFERENCES devices(id),
-    baseline_id UUID NOT NULL REFERENCES compliance_baselines(id),
-    score       SMALLINT NOT NULL,
-    passed      INT NOT NULL,
-    failed      INT NOT NULL,
-    details     JSONB NOT NULL,
-    scanned_at  TIMESTAMPTZ NOT NULL
-);
-
-CREATE INDEX idx_compliance_device ON compliance_results(device_id, scanned_at DESC);
+    id          CHAR(36)     PRIMARY KEY DEFAULT (UUID()),
+    tenant_id   CHAR(36)     NOT NULL,
+    device_id   CHAR(36)     NOT NULL,
+    baseline_id CHAR(36)     NOT NULL,
+    score       SMALLINT     NOT NULL,
+    passed      INT          NOT NULL,
+    failed      INT          NOT NULL,
+    details     JSON         NOT NULL,
+    scanned_at  DATETIME(3)  NOT NULL,
+    KEY idx_compliance_device (device_id, scanned_at),
+    CONSTRAINT fk_compliance_results_device FOREIGN KEY (device_id) REFERENCES devices(id),
+    CONSTRAINT fk_compliance_results_baseline FOREIGN KEY (baseline_id) REFERENCES compliance_baselines(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
 ### 3.6 审计（ClickHouse）
@@ -287,7 +285,7 @@ TTL timestamp + INTERVAL 365 DAY;
 
 ## 6. 迁移管理
 
-- 路径：`backend/{name}/src/main/resources/db/migration/`
+- 路径：`backend/server/src/main/resources/db/migration/`
 - 工具：Flyway
-- 命名：`000001_init.up.sql` / `000001_init.down.sql`
-- 共享基础表：`deploy/migrations/platform/`
+- 命名：`V1__init.sql`、`V2__add_users.sql`
+- 参考脚本：`deploy/migrations/platform/`

@@ -18,7 +18,7 @@
 │ API 通道     │ admin / app / agent 三端 REST API                    │
 │ 业务模块     │ Spring 包结构 module.* (非独立微服务)                  │
 │ 终端 Agent   │ Go 1.22+（跨平台、低资源占用）                       │
-│ 关系型数据库 │ PostgreSQL 16                                      │
+│ 关系型数据库 │ MySQL 8.4                                          │
 │ 缓存         │ Redis 7                                            │
 │ 消息队列     │ NATS JetStream                                     │
 │ 日志/遥测库  │ ClickHouse                                         │
@@ -74,7 +74,7 @@ backend/
 
 | 存储 | 用途 | Java 访问层 |
 |------|------|-------------|
-| PostgreSQL | 租户、用户、设备、策略 | MyBatis-Plus + HikariCP |
+| MySQL | 租户、用户、设备、策略 | MyBatis-Plus + HikariCP |
 | Redis | 会话、在线状态、策略缓存 | Spring Data Redis / Redisson |
 | ClickHouse | 审计日志、遥测 | clickhouse-jdbc 批量写入 |
 | MinIO | 安装包、取证文件 | AWS S3 SDK |
@@ -111,7 +111,7 @@ agent/
 | Spring Boot | 3.3.5 |
 | Spring Cloud | 2023.0.x (按需引入) |
 | MyBatis-Plus | 3.5.x |
-| PostgreSQL Driver | 42.7.x |
+| MySQL Connector/J | 8.3.x |
 | gRPC Java | 1.65.x |
 | Protobuf | 3.25.x |
 

@@ -19,7 +19,7 @@
 | 后端 | Java 21, Spring Boot 3.3, Maven |
 | 前端 | React 18, TypeScript, Ant Design |
 | Agent | Go 1.22+ |
-| 存储 | PostgreSQL, Redis, ClickHouse, MinIO |
+| 存储 | MySQL, Redis, ClickHouse, MinIO |
 
 ## 仓库结构
 

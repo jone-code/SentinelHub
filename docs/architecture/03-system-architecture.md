@@ -40,7 +40,7 @@ SentinelHub 采用 **单一 API 服务、内部分业务模块** 的架构，避
 Console (PC) → POST /api/admin/v1/policies
   → api.admin.PolicyController
   → module.policy.PolicyService
-  → PostgreSQL
+  → MySQL
   → 发布内部事件 → module.audit 记录
   → Agent 心跳拉取 → POST /agent/v1/heartbeat 返回策略包
 ```
@@ -92,7 +92,7 @@ flowchart TB
     end
 
     subgraph infra [基础设施]
-        PG[(PostgreSQL)]
+        MySQL[(MySQL)]
         Redis[(Redis)]
         CH[(ClickHouse)]
         NATS[NATS]
@@ -106,7 +106,7 @@ flowchart TB
     AppAPI --> modules
     AgentAPI --> modules
 
-    modules --> PG
+    modules --> MySQL
     modules --> Redis
     Audit --> CH
     modules --> NATS
@@ -129,7 +129,7 @@ flowchart TB
        └──────┬──────┘ └───────┘ └─────────────┘
               │
     ┌─────────▼──────────────────────────┐
-    │  PostgreSQL │ Redis │ NATS │ CH    │
+    │  MySQL │ Redis │ NATS │ CH    │
     └────────────────────────────────────┘
 ```
 

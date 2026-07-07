@@ -1,5 +1,4 @@
--- Platform baseline migration (MySQL 8.4)
--- Charset: utf8mb4
+-- SentinelHub initial schema (MySQL 8.4)
 
 CREATE TABLE IF NOT EXISTS tenants (
     id          CHAR(36)     PRIMARY KEY DEFAULT (UUID()),

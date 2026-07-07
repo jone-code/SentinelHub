@@ -37,6 +37,8 @@ backend/
 ./mvnw -pl server spring-boot:run
 ```
 
+需先启动 MySQL（`make dev-up`），默认连接 `localhost:3306/sentinelhub`。
+
 ## 健康检查
 
 ```bash
