@@ -17,24 +17,11 @@
     <packaging>pom</packaging>
 
     <name>SentinelHub Parent</name>
-    <description>Enterprise security office platform - parent POM</description>
+    <description>Enterprise security office platform</description>
 
     <modules>
         <module>common</module>
-        <module>gateway</module>
-        <module>identity</module>
-        <module>device</module>
-        <module>asset</module>
-        <module>audit</module>
-        <module>policy</module>
-        <module>software</module>
-        <module>compliance</module>
-        <module>dlp</module>
-        <module>nac</module>
-        <module>zerotrust</module>
-        <module>mdm</module>
-        <module>remote</module>
-        <module>ai</module>
+        <module>server</module>
     </modules>
 
     <properties>
@@ -51,15 +38,4 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
-
-    <build>
-        <pluginManagement>
-            <plugins>
-                <plugin>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-maven-plugin</artifactId>
-                </plugin>
-            </plugins>
-        </pluginManagement>
-    </build>
 </project>

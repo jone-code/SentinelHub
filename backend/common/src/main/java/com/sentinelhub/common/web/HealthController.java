@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 /**
- * Shared health check endpoints for all microservices.
+ * Shared health check endpoints.
  */
 @RestController
 public class HealthController {

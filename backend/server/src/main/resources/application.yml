@@ -1,0 +1,18 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: sentinelhub-server
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+sentinelhub:
+  api:
+    admin-prefix: /api/admin/v1
+    app-prefix: /api/app/v1
+    agent-prefix: /agent/v1

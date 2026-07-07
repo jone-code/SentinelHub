@@ -1,198 +1,151 @@
 # 系统架构
 
-## 1. 逻辑架构
+## 1. 架构模式：单体 API + 业务模块分包
+
+SentinelHub 采用 **单一 API 服务、内部分业务模块** 的架构，避免微服务带来的运维复杂度，同时保持代码按域清晰拆分。
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    sentinel-server (:8080)                   │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                    API 接入层                          │  │
+│  │  api.admin   api.app   api.agent                       │  │
+│  │  管理端 PC    手机 App   PC 终端 Agent                   │  │
+│  └─────────────────────────┬─────────────────────────────┘  │
+│  ┌─────────────────────────▼─────────────────────────────┐  │
+│  │                   业务模块层 (module.*)                  │  │
+│  │  identity │ device │ asset │ audit │ policy │ dlp │ ... │  │
+│  └─────────────────────────┬─────────────────────────────┘  │
+│  ┌─────────────────────────▼─────────────────────────────┐  │
+│  │              基础设施 (DB / Redis / NATS / CH)          │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 2. 三端 API 设计
+
+| 端 | 路径前缀 | 客户端 | 认证方式 |
+|----|----------|--------|----------|
+| **管理端** | `/api/admin/v1` | Web 控制台（PC 浏览器） | JWT / OIDC |
+| **移动端** | `/api/app/v1` | 手机管理 App（iOS/Android） | JWT + 设备绑定 |
+| **终端** | `/agent/v1` | PC Agent（Win/macOS/Linux） | mTLS + Agent 证书 |
+
+三个 API 层共享同一套 `module.*` 业务逻辑，仅在入参校验、响应裁剪、权限控制上有差异。
+
+## 3. 请求链路
+
+### 3.1 管理员配置策略
+
+```
+Console (PC) → POST /api/admin/v1/policies
+  → api.admin.PolicyController
+  → module.policy.PolicyService
+  → PostgreSQL
+  → 发布内部事件 → module.audit 记录
+  → Agent 心跳拉取 → POST /agent/v1/heartbeat 返回策略包
+```
+
+### 3.2 手机 App 查看设备
+
+```
+Mobile App → GET /api/app/v1/devices/summary
+  → api.app.AppDeviceController
+  → module.device.DeviceService
+  → 返回当前用户可见设备摘要（移动端优化字段）
+```
+
+### 3.3 终端注册与心跳
+
+```
+PC Agent → POST /agent/v1/register
+  → api.agent.AgentApiController
+  → module.device.DeviceService.register()
+  → 签发 mTLS 证书，触发 module.asset 采集
+
+周期心跳 → POST /agent/v1/heartbeat
+  → 返回策略增量、合规任务、远程指令
+```
+
+## 4. 逻辑架构
 
 ```mermaid
 flowchart TB
     subgraph clients [客户端]
-        Console[管理控制台]
-        Agent[终端 Agent]
-        IdP[企业 IdP]
+        Console[管理控制台 PC]
+        MobileApp[手机 App]
+        Agent[PC Agent]
     end
 
-    subgraph edge [接入层]
-        GW[API Gateway]
+    subgraph server [sentinel-server 统一 API 服务]
+        AdminAPI[api.admin]
+        AppAPI[api.app]
+        AgentAPI[api.agent]
+
+        subgraph modules [业务模块 module.*]
+            Identity[identity]
+            Device[device]
+            Asset[asset]
+            Policy[policy]
+            Audit[audit]
+            Others[software / dlp / nac / ...]
+        end
     end
 
-    subgraph platform [平台服务层]
-        Identity[Identity 身份租户]
-        Policy[Policy 策略引擎]
-        Device[Device 设备管控]
-        Asset[Asset 资产管理]
-        Software[Software 软件管控]
-        Compliance[Compliance 合规检查]
-        DLP[DLP 数据防泄漏]
-        NAC[NAC 终端准入]
-        ZeroTrust[ZeroTrust 零信任]
-        MDM[MDM 移动管控]
-        Remote[Remote 远程控制]
-        Audit[Audit 审计日志]
-        AI[AI 安全 预留]
-    end
-
-    subgraph infra [基础设施层]
+    subgraph infra [基础设施]
         PG[(PostgreSQL)]
         Redis[(Redis)]
         CH[(ClickHouse)]
-        NATS[NATS JetStream]
-        MinIO[MinIO]
+        NATS[NATS]
     end
 
-    Console --> GW
-    Agent --> GW
-    IdP --> Identity
-    GW --> Identity
-    GW --> Policy
-    GW --> Device
-    GW --> Asset
-    GW --> Audit
+    Console --> AdminAPI
+    MobileApp --> AppAPI
+    Agent --> AgentAPI
 
-    Policy --> NATS
-    Device --> NATS
-    Asset --> NATS
-    Software --> NATS
-    Compliance --> NATS
-    DLP --> NATS
-    NAC --> NATS
-    ZeroTrust --> NATS
-    MDM --> NATS
-    Remote --> NATS
+    AdminAPI --> modules
+    AppAPI --> modules
+    AgentAPI --> modules
 
-    NATS --> Audit
-    NATS --> AI
-
-    Identity --> PG
-    Policy --> PG
-    Device --> PG
-    Asset --> PG
-    Software --> PG
-    Compliance --> PG
-    DLP --> PG
-    NAC --> PG
-    ZeroTrust --> PG
-    MDM --> PG
-    Remote --> PG
-
-    Device --> Redis
-    Policy --> Redis
+    modules --> PG
+    modules --> Redis
     Audit --> CH
-    Device --> MinIO
+    modules --> NATS
 ```
 
-## 2. 请求链路
+## 5. 物理部署
 
-### 2.1 管理员配置策略
-
-```
-Console → Gateway (JWT 校验) → Policy Service
-  → 写入 PostgreSQL (策略版本)
-  → 发布 NATS: policy.updated.{tenant_id}
-  → Device Service 订阅 → 计算受影响设备集合
-  → 写入 Redis 待下发队列
-  → Agent 心跳/长轮询拉取 → 本地 Policy Engine 生效
-  → Agent 上报执行结果 → Audit Service → ClickHouse
-```
-
-### 2.2 终端注册与心跳
-
-```
-Agent 首次启动 → 携带设备指纹 + 租户凭证 → Gateway → Device Service
-  → 创建设备记录 (PostgreSQL)
-  → 发布 device.registered
-  → Asset Service 触发全量资产采集任务
-  → 返回 Agent ID + mTLS 证书 + 初始配置
-
-周期心跳 (默认 60s) → Device Service 更新 last_seen (Redis + PG)
-  → 返回待执行指令 (策略增量、远程任务、合规扫描)
-```
-
-### 2.3 合规检查与 NAC 联动
-
-```
-Compliance Service 下发检查项 → Agent 执行 → 上报结果
-  → Compliance 计算合规分数 → 写入 device.compliance_score
-  → 发布 compliance.score_changed
-  → NAC Service 订阅 → 更新准入决策缓存
-  → 网络侧 (802.1X/RADIUS) 或 Agent 本地网络钩子执行放行/隔离
-```
-
-## 3. 物理部署架构
-
-### 3.1 标准集群（推荐生产）
+### 5.1 标准部署（推荐）
 
 ```
                     ┌─────────────┐
                     │   LB/Ingress │
                     └──────┬──────┘
-           ┌───────────────┼───────────────┐
-           │               │               │
-    ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
-    │  Gateway x2 │ │ Console x2  │ │  gRPC Svc   │
-    │  (无状态)    │ │  (静态资源)  │ │  (按域扩展)  │
-    └──────┬──────┘ └─────────────┘ └──────┬──────┘
-           │                               │
-    ┌──────▼───────────────────────────────▼──────┐
-    │              Kubernetes Cluster              │
-    │  ┌─────────┐ ┌─────────┐ ┌───────────────┐  │
-    │  │PostgreSQL│ │  Redis  │ │ NATS Cluster │  │
-    │  │ (主从)   │ │ (哨兵)  │ │              │  │
-    │  └─────────┘ └─────────┘ └───────────────┘  │
-    │  ┌─────────────┐ ┌─────────┐                │
-    │  │ ClickHouse  │ │  MinIO  │                │
-    │  │  (分片副本)  │ │         │                │
-    │  └─────────────┘ └─────────┘                │
-    └─────────────────────────────────────────────┘
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+       ┌──────▼──────┐ ┌───▼───┐ ┌──────▼──────┐
+       │ sentinel-   │ │console│ │  mobile CDN │
+       │ server x2   │ │ (静态) │ │  (App 分发)  │
+       └──────┬──────┘ └───────┘ └─────────────┘
+              │
+    ┌─────────▼──────────────────────────┐
+    │  PostgreSQL │ Redis │ NATS │ CH    │
+    └────────────────────────────────────┘
 ```
 
-### 3.2 小型私有化（单机 Docker Compose）
+### 5.2 小型私有化
 
-适用于 &lt; 2000 终端：所有服务单副本，PostgreSQL/Redis/NATS/ClickHouse 各一实例。
+单实例 `sentinel-server` + docker-compose 基础设施，适用于 &lt; 5000 终端。
 
-## 4. 多租户模型
+## 6. 多租户模型
 
-```
-Tenant (租户)
-  ├── OrgUnit (组织单元，树形)
-  ├── User (用户，RBAC)
-  ├── Device (设备，归属 OrgUnit)
-  ├── Policy (策略，可绑定 OrgUnit/DeviceGroup)
-  └── License (授权模块与终端数上限)
-```
+不变：所有业务表带 `tenant_id`，`module.identity` 负责租户上下文，`api.*` 层从 Token 注入。
 
-- **数据隔离**：所有业务表带 `tenant_id`，网关层注入租户上下文
-- **网络隔离**：可选独立子域名或独立集群（大客户）
-- **模块授权**：License 控制 DLP/NAC/零信任等模块开关
+## 7. 何时拆分微服务
 
-## 5. Agent 与云端连接模式
+当前阶段 **不拆分**。仅在以下情况考虑独立服务：
+- 单模块 CPU/内存占用超过整机 60%
+- 需要独立扩缩容（如审计写入 ClickHouse）
+- 团队规模 &gt; 20 人且模块完全独立发布
 
-| 模式 | 适用场景 | 实现 |
-|------|----------|------|
-| 长轮询 | 默认，防火墙友好 | Agent 每 30-60s 请求 `/agent/v1/sync` |
-| WebSocket | 需要实时指令 | 远程控制、紧急策略 |
-| MQTT (可选) | 超大规模 | 独立 MQTT Broker，Agent 订阅租户主题 |
-
-证书：每个 Agent 持有唯一客户端证书，由 Device Service 在注册时签发（内部 CA）。
-
-## 6. 事件驱动约定
-
-主题命名：`sentinel.{domain}.{action}.{tenant_id}`
-
-示例：
-- `sentinel.policy.updated.t001`
-- `sentinel.device.registered.t001`
-- `sentinel.compliance.failed.t001`
-- `sentinel.dlp.blocked.t001`
-
-所有安全相关事件 **必须** 被 Audit Service 消费并落库，业务服务禁止仅写本地日志。
-
-## 7. 高可用与容量参考
-
-| 指标 | 1万终端 | 5万终端 |
-|------|---------|---------|
-| Gateway | 2 实例 4C8G | 4 实例 8C16G |
-| Device/Policy | 各 2 实例 | 各 4 实例 |
-| PostgreSQL | 8C32G 主从 | 16C64G + 读副本 |
-| ClickHouse | 3 节点 | 5 节点 |
-| NATS | 3 节点集群 | 3-5 节点 |
-
-心跳聚合：Device Service 使用 Redis 批量刷盘，降低 PG 写压力。
+届时可将 `module.audit` 等抽为独立进程，API 层通过接口调用，无需重写业务逻辑。

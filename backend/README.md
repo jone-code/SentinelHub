@@ -1,59 +1,67 @@
 # SentinelHub Backend
 
-Java 21 + Spring Boot 3.3 多模块后端（Maven）。
+Java 21 + Spring Boot 3.3，**单体 API 服务 + 业务模块分包**架构。
 
-## 模块列表
-
-| 模块 | 端口 | 说明 |
-|------|------|------|
-| gateway | 8080 | API 网关 |
-| identity | 8081 | 身份与租户 |
-| device | 8082 | 设备管控 |
-| asset | 8083 | 资产管理 |
-| audit | 8084 | 审计日志 |
-| policy | 8085 | 策略引擎 |
-| software | 8086 | 软件管控 |
-| compliance | 8087 | 合规检查 |
-| dlp | 8088 | 数据防泄漏 |
-| nac | 8089 | 终端准入 |
-| zerotrust | 8090 | 零信任 |
-| mdm | 8091 | MDM |
-| remote | 8092 | 远程控制 |
-| ai | 8093 | AI 安全（预留） |
-
-## 构建
-
-```bash
-mvn clean package
-# 或使用 Maven Wrapper
-./mvnw clean package
-```
-
-## 运行
-
-```bash
-# 启动单个服务
-mvn -pl gateway spring-boot:run
-mvn -pl device spring-boot:run
-
-# 健康检查
-curl http://localhost:8080/health
-```
-
-## 公共库
-
-`common` 模块（`sentinel-common`）提供：
-- `ApiResponse` / `PageResponse` — 统一 API 响应
-- `TenantContext` — 多租户上下文
-- `AuditEvent` — 审计事件模型
-- `HealthController` — 健康检查端点
-
-## 项目结构
+## 架构说明
 
 ```
 backend/
-├── pom.xml                 # 父 POM（依赖版本管理）
-├── common/pom.xml          # 公共库
-├── gateway/pom.xml         # 各业务微服务
-└── ...
+├── common/          # 公共库（DTO、审计模型、工具类）
+└── server/          # 统一 API 服务（唯一可执行模块）
+    └── src/main/java/com/sentinelhub/
+        ├── api/
+        │   ├── admin/     # 管理端 API（Web 控制台）
+        │   ├── app/       # 移动端 API（手机 App）
+        │   └── agent/     # 终端 API（PC Agent）
+        └── module/
+            ├── identity/  # 身份租户
+            ├── device/    # 设备管控
+            ├── asset/     # 资产管理
+            └── ...        # 其他业务模块
 ```
+
+**设计原则**：按业务域分包，不按微服务拆进程。对外只有一个 API 服务（`:8080`）。
+
+## API 端点分层
+
+| 客户端 | 路径前缀 | 说明 |
+|--------|----------|------|
+| 管理端（PC 浏览器） | `/api/admin/v1` | Web 控制台 |
+| 移动端（手机 App） | `/api/app/v1` | iOS / Android 管理 App |
+| 终端（PC Agent） | `/agent/v1` | Windows / macOS / Linux 客户端 |
+
+## 构建与运行
+
+```bash
+./mvnw clean package -DskipTests
+./mvnw -pl server spring-boot:run
+```
+
+## 健康检查
+
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8080/api/admin/v1/info
+curl http://localhost:8080/api/app/v1/info
+curl http://localhost:8080/agent/v1/info
+```
+
+## 业务模块
+
+| 包路径 | 能力 |
+|--------|------|
+| `module.identity` | 租户、用户、RBAC |
+| `module.device` | 设备注册、心跳、分组 |
+| `module.asset` | 软硬件资产 |
+| `module.audit` | 审计日志 |
+| `module.policy` | 策略引擎 |
+| `module.software` | 软件管控 |
+| `module.compliance` | 合规检查 |
+| `module.dlp` | 数据防泄漏 |
+| `module.nac` | 终端准入 |
+| `module.zerotrust` | 零信任 |
+| `module.mdm` | 移动设备管理 |
+| `module.remote` | 远程控制 |
+| `module.ai` | AI 安全（预留） |
+
+API 层（`api.admin` / `api.app` / `api.agent`）负责协议适配，调用 `module.*` 业务服务。

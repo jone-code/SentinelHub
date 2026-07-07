@@ -1,11 +1,17 @@
 # API 设计规范
 
-## 1. 基本原则
+## 1. 总体结构
 
-- **RESTful** 风格，资源名词复数
-- **版本前缀**：`/api/v1`
-- **租户隔离**：从 JWT `tenant_id` 注入，禁止客户端指定其他租户
-- **统一响应信封**
+单一 API 服务 `sentinel-server`（默认 `:8080`），按客户端分三条 API 通道：
+
+```
+/api/admin/v1/**    管理端（PC Web 控制台）
+/api/app/v1/**      移动端（手机 App）
+/agent/v1/**        终端（PC Agent）
+/health             健康检查（公共）
+```
+
+## 2. 统一响应信封
 
 ```json
 {
@@ -16,86 +22,47 @@
 }
 ```
 
-错误响应：
+## 3. 认证
 
-```json
-{
-  "code": 40001,
-  "message": "device not found",
-  "details": { "device_id": "..." },
-  "request_id": "req_abc123"
-}
-```
+| 通道 | 方式 |
+|------|------|
+| `/api/admin/v1` | `Authorization: Bearer <JWT>` |
+| `/api/app/v1` | `Authorization: Bearer <JWT>` + 可选 `X-Device-Id` |
+| `/agent/v1` | mTLS 客户端证书 + `X-Agent-Id` |
 
-## 2. 认证
+## 4. 管理端 API（`/api/admin/v1`）
 
-| 调用方 | 方式 |
-|--------|------|
-| 管理控制台 | `Authorization: Bearer <JWT>` |
-| Agent | mTLS 客户端证书 + `X-Agent-ID` |
-| 服务间 | gRPC mTLS + metadata `x-tenant-id` |
-
-## 3. 通用约定
-
-### 3.1 分页
-
-```
-GET /api/v1/devices?page=1&page_size=20&sort=-created_at
-```
-
-响应：
-
-```json
-{
-  "code": 0,
-  "data": {
-    "items": [],
-    "total": 100,
-    "page": 1,
-    "page_size": 20
-  }
-}
-```
-
-### 3.2 过滤
-
-```
-GET /api/v1/devices?status=active&os_type=windows&org_unit_id=uuid
-GET /api/v1/audit/logs?event_type=dlp.block&start_time=2026-01-01T00:00:00Z
-```
-
-### 3.3 批量操作
-
-```
-POST /api/v1/devices/batch
-{
-  "action": "assign_group",
-  "device_ids": ["uuid1", "uuid2"],
-  "params": { "group_id": "uuid" }
-}
-```
-
-## 4. 核心 API 清单（P0）
-
-### 身份
+面向 PC 浏览器管理控制台，提供完整管理能力。
 
 | Method | Path | 说明 |
 |--------|------|------|
-| POST | `/api/v1/auth/login` | 登录 |
-| POST | `/api/v1/auth/refresh` | 刷新令牌 |
-| GET | `/api/v1/users/me` | 当前用户 |
+| POST | `/api/admin/v1/auth/login` | 管理员登录 |
+| GET | `/api/admin/v1/users/me` | 当前用户 |
+| GET | `/api/admin/v1/devices` | 设备列表（全量） |
+| GET | `/api/admin/v1/devices/{id}` | 设备详情 |
+| GET | `/api/admin/v1/assets/software` | 软件资产 |
+| GET | `/api/admin/v1/audit/logs` | 审计查询 |
+| CRUD | `/api/admin/v1/policies` | 策略管理 |
+| GET | `/api/admin/v1/compliance/scans` | 合规扫描 |
 
-### 设备
+## 5. 移动端 API（`/api/app/v1`）
+
+面向 iOS/Android 管理 App，侧重查看、告警、轻量审批。
 
 | Method | Path | 说明 |
 |--------|------|------|
-| GET | `/api/v1/devices` | 设备列表 |
-| GET | `/api/v1/devices/{id}` | 设备详情 |
-| PATCH | `/api/v1/devices/{id}` | 更新（分组、备注） |
-| DELETE | `/api/v1/devices/{id}` | 吊销设备 |
-| POST | `/api/v1/device-groups` | 创建设备组 |
+| POST | `/api/app/v1/auth/login` | 移动端登录 |
+| GET | `/api/app/v1/devices` | 我的设备（精简） |
+| GET | `/api/app/v1/devices/summary` | 设备概览统计 |
+| GET | `/api/app/v1/alerts` | 告警列表 |
+| POST | `/api/app/v1/alerts/{id}/ack` | 确认告警 |
+| GET | `/api/app/v1/compliance/overview` | 合规概览 |
 
-### Agent（独立前缀 `/agent/v1`）
+移动端响应字段较管理端精简，不暴露敏感策略细节。
+
+## 6. 终端 API（`/agent/v1`）
+
+面向 Windows/macOS/Linux PC Agent。
 
 | Method | Path | 说明 |
 |--------|------|------|
@@ -103,105 +70,52 @@ POST /api/v1/devices/batch
 | POST | `/agent/v1/heartbeat` | 心跳与指令拉取 |
 | POST | `/agent/v1/report/assets` | 资产上报 |
 | POST | `/agent/v1/report/events` | 事件批量上报 |
+| GET | `/agent/v1/policy-bundle` | 下载策略包 |
 
-### 资产
-
-| Method | Path | 说明 |
-|--------|------|------|
-| GET | `/api/v1/assets/devices/{device_id}` | 设备资产详情 |
-| GET | `/api/v1/assets/software` | 软件清单聚合查询 |
-
-### 审计
-
-| Method | Path | 说明 |
-|--------|------|------|
-| GET | `/api/v1/audit/logs` | 审计查询 |
-| POST | `/api/v1/audit/export` | 异步导出 |
-
-### 策略（P1）
-
-| Method | Path | 说明 |
-|--------|------|------|
-| GET/POST | `/api/v1/policies` | 列表/创建 |
-| GET/PUT | `/api/v1/policies/{id}` | 详情/更新 |
-| POST | `/api/v1/policies/{id}/publish` | 发布 |
-| GET | `/api/v1/policies/effective` | 查询设备生效策略 |
-
-## 5. Agent 心跳响应结构
+### 心跳响应
 
 ```json
 {
-  "server_time": "2026-07-07T15:00:00Z",
-  "config_version": "cfg_v12",
-  "policy_bundle": {
-    "version": "pol_v45",
-    "hash": "sha256:...",
-    "url": "/agent/v1/policy-bundle/pol_v45"
-  },
-  "commands": [
-    {
-      "id": "cmd_uuid",
-      "type": "compliance.scan",
-      "params": { "baseline_id": "..." },
-      "expires_at": "2026-07-07T16:00:00Z"
-    }
-  ]
-}
-```
-
-## 6. WebSocket 事件（控制台）
-
-连接：`WSS /api/v1/ws?token=...`
-
-```json
-{
-  "type": "alert",
-  "payload": {
-    "severity": "high",
-    "module": "dlp",
-    "title": "敏感文件外发被阻断",
-    "device_id": "...",
-    "timestamp": "..."
+  "code": 0,
+  "data": {
+    "server_time": "2026-07-07T16:00:00Z",
+    "policy_bundle": { "version": "pol_v1", "hash": "sha256:..." },
+    "commands": []
   }
 }
 ```
 
-## 7. gRPC 服务定义
+## 7. 分页与过滤
 
-Proto 文件位于 `proto/`：
+管理端支持完整分页：
 
 ```
-proto/
-├── common/v1/common.proto
-├── identity/v1/identity.proto
-├── device/v1/device.proto
-├── policy/v1/policy.proto
-└── agent/v1/agent.proto
+GET /api/admin/v1/devices?page=1&page_size=20&status=active
 ```
 
-命名：`{package}.v1.{Service}/{Method}`
+移动端默认较小 page_size（如 10），减少流量。
 
-## 8. 错误码分段
+## 8. WebSocket（管理端实时通知）
 
-| 范围 | 模块 |
+```
+WSS /api/admin/v1/ws?token=...
+```
+
+用于控制台实时告警推送。
+
+## 9. 错误码分段
+
+| 范围 | 说明 |
 |------|------|
 | 0 | 成功 |
 | 40000-40999 | 通用客户端错误 |
 | 41000-41999 | identity |
 | 42000-42999 | device |
 | 43000-43999 | policy |
-| 44000-44999 | compliance |
-| 45000-45999 | dlp |
-| 50000+ | 服务端内部错误 |
-
-## 9. OpenAPI
-
-- 聚合文档：`api/openapi.yaml`（由各领域 fragment 合并）
-- 每个服务维护 `backend/{name}/src/main/resources/openapi.yaml`
-- CI 校验 breaking change
+| 50000+ | 服务端错误 |
 
 ## 10. 版本演进
 
-- v1 稳定期内仅 additive 变更
-- Breaking change 发布 v2，v1 保留至少 6 个月
-- Agent 协议需向后兼容至少 2 个大版本
+- 各通道独立版本：`/api/admin/v1`、`/api/app/v1`、`/agent/v1`
+- 向后兼容至少 2 个大版本
+- Agent 协议变更需同步更新 `agent/` 与 `proto/agent/`

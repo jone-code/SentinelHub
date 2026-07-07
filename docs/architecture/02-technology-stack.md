@@ -14,9 +14,9 @@
 │ 层级         │ 选型                                              │
 ├─────────────┼──────────────────────────────────────────────────┤
 │ 管理控制台   │ React 18, TypeScript, Vite, Ant Design, Zustand  │
-│ API 网关     │ Spring Cloud Gateway / Spring Boot (Java 21)       │
-│ 业务微服务   │ Spring Boot 3.3, Spring Security, MyBatis-Plus   │
-│ 服务间通信   │ gRPC (protobuf) + OpenFeign (REST 内部调用)         │
+│ 统一 API 服务 │ Spring Boot 3.3 单体 + 业务模块分包 (Java 21)        │
+│ API 通道     │ admin / app / agent 三端 REST API                    │
+│ 业务模块     │ Spring 包结构 module.* (非独立微服务)                  │
 │ 终端 Agent   │ Go 1.22+（跨平台、低资源占用）                       │
 │ 关系型数据库 │ PostgreSQL 16                                      │
 │ 缓存         │ Redis 7                                            │
@@ -45,35 +45,30 @@
 
 ```
 backend/
-├── pom.xml                   # 父 POM（Spring Boot BOM）
-├── common/                   # 公共 DTO、审计模型、租户上下文
-├── gateway/                  # API 网关 (:8080)
-├── identity/                 # 身份租户 (:8081)
-├── device/                   # 设备管控 (:8082)
-├── asset/                    # 资产管理 (:8083)
-├── audit/                    # 审计日志 (:8084)
-├── policy/                   # 策略引擎 (:8085)
-├── software/                 # 软件管控 (:8086)
-├── compliance/               # 合规检查 (:8087)
-├── dlp/                      # DLP (:8088)
-├── nac/                      # NAC (:8089)
-├── zerotrust/                # 零信任 (:8090)
-├── mdm/                      # MDM (:8091)
-├── remote/                   # 远程控制 (:8092)
-└── ai/                       # AI 安全 (:8093)
+├── pom.xml              # 父 POM
+├── common/              # 公共库
+└── server/              # 统一 API 服务（唯一进程 :8080）
+    └── src/main/java/com/sentinelhub/
+        ├── api/
+        │   ├── admin/   # 管理端 API — PC Web 控制台
+        │   ├── app/     # 移动端 API — 手机 App
+        │   └── agent/   # 终端 API — PC Agent
+        └── module/
+            ├── identity/
+            ├── device/
+            ├── asset/
+            └── ...      # 按业务域分包，非独立微服务
 ```
-
-每个可执行模块均为独立 Spring Boot 应用，后期可按负载独立扩缩容，也可合并为单体启动（开发期）。
 
 ### 3.3 通信协议
 
 | 场景 | 协议 | 说明 |
 |------|------|------|
-| 控制台 ↔ 网关 | HTTPS REST + WebSocket | OpenAPI 3 规范 |
-| 网关 ↔ 微服务 | Spring Cloud Gateway 路由 / gRPC | 内网 mTLS |
-| Agent ↔ 平台 | HTTPS + mTLS | REST 长轮询，大规模可升级 MQTT |
-| 服务间异步 | NATS JetStream | 审计、资产变更、策略下发 |
-| 内部 REST | OpenFeign | 同步查询类调用 |
+| 管理控制台 | HTTPS `/api/admin/v1` | PC 浏览器 |
+| 手机 App | HTTPS `/api/app/v1` | iOS / Android |
+| PC Agent | HTTPS `/agent/v1` + mTLS | Windows / macOS / Linux |
+| 模块间调用 | Spring Bean 注入 | 同进程，无网络开销 |
+| 异步事件 | NATS JetStream（可选） | 审计、告警通知 |
 
 ### 3.4 存储分工
 
@@ -136,4 +131,4 @@ agent/
 - **Proto 生成**：protobuf-maven-plugin
 - **代码规范**：Checkstyle, SpotBugs, ESLint (前端)
 - **数据库迁移**：Flyway
-- **本地开发**：docker-compose + `mvn -pl gateway spring-boot:run`
+- **本地开发**：docker-compose + `mvn -pl server spring-boot:run`

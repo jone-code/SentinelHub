@@ -1,331 +1,141 @@
 # 功能模块设计
 
-本文档定义各业务模块的职责边界、对外接口、数据依赖与开发顺序。
+本文档定义业务模块的职责边界、API 分层与开发顺序。
+
+> **架构原则**：不按微服务拆进程，按 **业务包（module.*）** 组织代码，由 **单一 sentinel-server** 对外提供 API。
 
 ## 1. 模块总览
 
-| 模块 ID | 服务名 | 目录 | 阶段 | 状态 |
-|---------|--------|------|------|------|
-| M01 | gateway | `backend/gateway` | P0 | 骨架 |
-| M02 | identity | `backend/identity` | P0 | 骨架 |
-| M03 | device | `backend/device` | P0 | 骨架 |
-| M04 | asset | `backend/asset` | P0 | 骨架 |
-| M05 | audit | `backend/audit` | P0 | 骨架 |
-| M06 | policy | `backend/policy` | P1 | 骨架 |
-| M07 | software | `backend/software` | P1 | 骨架 |
-| M08 | compliance | `backend/compliance` | P1 | 骨架 |
-| M09 | dlp | `backend/dlp` | P2 | 骨架 |
-| M10 | nac | `backend/nac` | P2 | 骨架 |
-| M11 | zerotrust | `backend/zerotrust` | P3 | 骨架 |
-| M12 | mdm | `backend/mdm` | P3 | 骨架 |
-| M13 | remote | `backend/remote` | P3 | 骨架 |
-| M14 | ai | `backend/ai` | P4 | 预留 |
-| — | agent | `agent` | P0 | 骨架 |
-| — | console | `console` | P0 | 骨架 |
+### 1.1 API 接入层
 
-## 2. 平台基础模块
+| 包路径 | 路径前缀 | 客户端 | 阶段 |
+|--------|----------|--------|------|
+| `api.admin` | `/api/admin/v1` | Web 管理控制台（PC） | P0 |
+| `api.app` | `/api/app/v1` | 手机管理 App | P0 |
+| `api.agent` | `/agent/v1` | PC 终端 Agent | P0 |
 
-### M01 Gateway（API 网关）
+### 1.2 业务模块层
 
-**职责**
-- HTTP/HTTPS 统一入口，路由到各微服务
-- JWT/OIDC 令牌校验，租户上下文注入
-- 限流、CORS、请求日志、API 版本路由 (`/api/v1`)
+| 模块 ID | 包路径 | 阶段 | 状态 |
+|---------|--------|------|------|
+| M02 | `module.identity` | P0 | 骨架 |
+| M03 | `module.device` | P0 | 骨架 |
+| M04 | `module.asset` | P0 | 骨架 |
+| M05 | `module.audit` | P0 | 骨架 |
+| M06 | `module.policy` | P1 | 骨架 |
+| M07 | `module.software` | P1 | 骨架 |
+| M08 | `module.compliance` | P1 | 骨架 |
+| M09 | `module.dlp` | P2 | 骨架 |
+| M10 | `module.nac` | P2 | 骨架 |
+| M11 | `module.zerotrust` | P3 | 骨架 |
+| M12 | `module.mdm` | P3 | 骨架 |
+| M13 | `module.remote` | P3 | 骨架 |
+| M14 | `module.ai` | P4 | 预留 |
 
-**对外接口**
-- `GET /health`
-- 代理 `/api/v1/*` → 各服务 REST
-- `WS /api/v1/ws` → 实时通知
+## 2. 代码结构
 
-**依赖**：identity（公钥/JWKS）、Redis（限流）
+```
+backend/server/src/main/java/com/sentinelhub/
+├── SentinelHubApplication.java
+├── config/                     # 全局配置、安全、WebMvc
+├── api/
+│   ├── admin/                  # 管理端 Controller
+│   │   ├── AdminDeviceController.java
+│   │   ├── AdminPolicyController.java
+│   │   └── ...
+│   ├── app/                    # 移动端 Controller
+│   │   ├── AppDeviceController.java
+│   │   └── ...
+│   └── agent/                  # 终端 Controller
+│       ├── AgentApiController.java
+│       └── ...
+└── module/
+    ├── device/
+    │   ├── DeviceService.java
+    │   ├── DeviceRepository.java
+    │   └── domain/
+    ├── asset/
+    └── ...
+```
 
----
+**调用关系**：`api.*` → `module.*`，禁止 `api.admin` 直接访问 `api.agent` 的包。
+
+## 3. 业务模块详情
 
 ### M02 Identity（身份与租户）
 
-**职责**
-- 租户、组织单元、用户、角色 (RBAC)
-- OIDC 集成、API Key（Agent 注册）
-- License 模块授权校验
+**职责**：租户、组织、用户、RBAC、License
 
-**核心 API**
-- `POST /api/v1/auth/login`
-- `GET /api/v1/users`, `GET /api/v1/roles`
-- `GET /api/v1/tenants/{id}/license`
-
-**事件发布**
-- `sentinel.identity.user.created`
-- `sentinel.identity.license.updated`
-
-**依赖**：PostgreSQL
+**被调用方**：
+- `api.admin` — 用户管理、登录
+- `api.app` — 移动端登录、个人中心
 
 ---
 
 ### M03 Device（设备管控）
 
-**职责**
-- 设备注册、分组、在线状态、心跳
-- Agent 证书签发与吊销
-- 指令队列（策略同步、远程任务触发）
+**职责**：设备注册、分组、在线状态、心跳、指令队列
 
-**核心 API**
-- `POST /api/v1/agent/register`
-- `POST /api/v1/agent/heartbeat`
-- `GET /api/v1/devices`, `PATCH /api/v1/devices/{id}`
-- `POST /api/v1/device-groups`
-
-**Agent 协议**
-- 见 `proto/agent/v1/device.proto`
-
-**事件**
-- `sentinel.device.registered`
-- `sentinel.device.offline`（超时检测）
-
-**依赖**：PostgreSQL, Redis, MinIO（证书）, policy（策略版本）
+**API 暴露**：
+- Admin: `GET/POST /api/admin/v1/devices`
+- App: `GET /api/app/v1/devices`
+- Agent: `POST /agent/v1/register`, `POST /agent/v1/heartbeat`
 
 ---
 
 ### M04 Asset（资产管理）
 
-**职责**
-- 硬件清单（CPU/内存/磁盘/网卡）
-- 软件清单（安装包、版本、厂商）
-- 资产变更检测与 CMDB 导出
+**职责**：硬件/软件清单、变更检测
 
-**核心 API**
-- `GET /api/v1/assets/devices/{device_id}`
-- `GET /api/v1/assets/software`
-- `POST /api/v1/assets/export`
-
-**数据流**
-- 订阅 `device.registered` → 触发全量采集
-- 消费 Agent 上报 `asset.inventory`
-
-**依赖**：PostgreSQL, device
+**API 暴露**：
+- Admin: `GET /api/admin/v1/assets/**`
+- Agent: `POST /agent/v1/report/assets`
 
 ---
 
 ### M05 Audit（审计日志）
 
-**职责**
-- 统一接收各模块审计事件
-- 查询、导出、留存策略
-- 对接 SIEM（Syslog/Webhook）
+**职责**：统一审计写入与查询
 
-**核心 API**
-- `GET /api/v1/audit/logs`（多维度筛选）
-- `POST /api/v1/audit/export`
-
-**写入**
-- 订阅 NATS `sentinel.>` 全量安全事件
-- Agent 直传操作类日志
-
-**依赖**：ClickHouse, MinIO（导出文件）
-
-## 3. 策略与管控模块
-
-### M06 Policy（策略引擎）
-
-**职责**
-- 策略模板、策略集、版本管理
-- 策略冲突检测与生效范围计算
-- 策略包编译（供 Agent 本地执行）
-
-**策略类型枚举**
-```go
-type PolicyType string
-const (
-    PolicySoftware   PolicyType = "software"
-    PolicyCompliance PolicyType = "compliance"
-    PolicyDLP        PolicyType = "dlp"
-    PolicyNAC        PolicyType = "nac"
-    PolicyZeroTrust  PolicyType = "zerotrust"
-    PolicyMDM        PolicyType = "mdm"
-    PolicyRemote     PolicyType = "remote"
-)
-```
-
-**核心 API**
-- `CRUD /api/v1/policies`
-- `POST /api/v1/policies/{id}/publish`
-- `GET /api/v1/policies/effective?device_id=`
-
-**依赖**：PostgreSQL, Redis, NATS
+**API 暴露**：
+- Admin: `GET /api/admin/v1/audit/logs`
+- 内部：各 module 通过 `AuditService` 写入
 
 ---
 
-### M07 Software（软件管控）
+### M06~M14 其他模块
 
-**职责**
-- 软件白名单/黑名单策略
-- 安装拦截、运行拦截、违规软件告警
-- 与 asset 软件清单联动
+策略、软件管控、合规、DLP、NAC、零信任、MDM、远程、AI — 业务逻辑均在 `module.*` 实现，管理类 API 走 `api.admin`，终端执行走 `api.agent`，移动端查看走 `api.app`。
 
-**Agent Enforcer**：`agent/enforcers/software`
+## 4. 三端 API 差异示例（设备列表）
 
-**事件**：`sentinel.software.violation`
+| 端 | 接口 | 差异 |
+|----|------|------|
+| Admin | `GET /api/admin/v1/devices` | 全量字段、分页、导出、管理操作 |
+| App | `GET /api/app/v1/devices` | 精简字段、仅当前用户相关设备 |
+| Agent | `POST /agent/v1/heartbeat` | 上报状态、拉取指令，非查询列表 |
 
----
-
-### M08 Compliance（合规检查）
-
-**职责**
-- 合规基线库（等保/CIS/自定义）
-- 检查任务调度与结果评分
-- 不合规项修复建议 / 自动修复脚本
-
-**核心 API**
-- `GET /api/v1/compliance/baselines`
-- `POST /api/v1/compliance/scans`
-- `GET /api/v1/compliance/devices/{id}/score`
-
-**输出**：`compliance_score` 供 NAC/零信任消费
-
----
-
-### M09 DLP（数据防泄漏）
-
-**职责**
-- 敏感数据识别规则（正则、关键词、文档指纹）
-- 通道管控：USB、打印、剪贴板、邮件、IM、外发文件
-- 水印、加密、阻断、审批放行
-
-**Agent Enforcer**：`agent/enforcers/dlp`
-
-**存储**：DLP 事件 → ClickHouse；取证文件 → MinIO
-
----
-
-### M10 NAC（终端准入）
-
-**职责**
-- 准入策略（合规分数、AV 状态、域加入等）
-- 与网络设备对接：RADIUS、802.1X、交换机 CoA
-- VLAN 动态分配、隔离区
-
-**部署组件**
-- `backend/nac`：策略与决策
-- `deploy/nac/radius`：FreeRADIUS 配置模板（可选）
-
----
-
-### M11 ZeroTrust（零信任）
-
-**职责**
-- 设备信任分、用户信任分、持续评估
-- 应用级访问代理（SDP 轻量实现或对接现有 ZTNA）
-- 微隔离策略
-
-**与 NAC 关系**：NAC 管网络层准入；零信任管应用层访问，共享设备信任分。
-
----
-
-### M12 MDM（移动设备管理）
-
-**职责**
-- iOS/Android 设备注册（ABM/EMM 对接）
-- 配置描述文件、应用分发、远程擦除
-- 与工作手机容器化方案集成
-
-**说明**：移动端 Agent 或 MDM 协议与桌面 Agent 分轨，共享 device/asset 模型。
-
----
-
-### M13 Remote（远程控制）
-
-**职责**
-- 远程桌面会话建立（需用户确认或可配置静默）
-- 会话录制、双人授权、操作审计
-- 文件传输（受 DLP 策略约束）
-
-**协议**：WebRTC 信令经 Gateway，媒体可 P2P 或 TURN 中继
-
----
-
-### M14 AI（安全能力，预留）
-
-**职责**
-- 用户/设备异常行为检测（UEBA 轻量）
-- 策略推荐与自然语言查询
-- 威胁情报关联
-
-**接入点**
-- 消费 ClickHouse 审计流
-- 提供 `POST /api/v1/ai/query` 供控制台调用
-- 插件接口：`backend/ai` 模块 SPI 扩展点
-
-## 4. 终端 Agent 模块
-
-```
-agent/
-├── cmd/agent/              # 主程序入口
-├── core/                   # 配置、升级、自检
-├── transport/              # mTLS、同步协议
-├── policy/                 # 本地策略引擎
-├── collectors/             # 资产/软件/合规采集
-├── enforcers/              # 各管控插件
-│   ├── software/
-│   ├── dlp/
-│   ├── nac/
-│   └── ...
-└── platform/               # OS 特定实现
-    ├── windows/
-    ├── darwin/
-    └── linux/
-```
-
-**与云端契约**：`proto/agent/v1/*.proto`
-
-## 5. 管理控制台
-
-```
-console/
-├── src/
-│   ├── pages/              # 按模块分页面
-│   │   ├── dashboard/
-│   │   ├── devices/
-│   │   ├── assets/
-│   │   ├── policies/
-│   │   ├── compliance/
-│   │   ├── dlp/
-│   │   ├── audit/
-│   │   └── ...
-│   ├── services/           # API 客户端
-│   └── components/
-```
-
-## 6. 模块依赖图
+## 5. 模块依赖
 
 ```mermaid
 graph LR
-    GW[gateway] --> ID[identity]
-    GW --> DV[device]
-    GW --> PO[policy]
-    GW --> AU[audit]
+    AdminAPI[api.admin] --> modules
+    AppAPI[api.app] --> modules
+    AgentAPI[api.agent] --> modules
 
-    DV --> PO
-    DV --> AS[asset]
-    AS --> DV
-
-    PO --> SW[software]
-    PO --> CP[compliance]
-    PO --> DL[dlp]
-    PO --> NA[nac]
-    PO --> ZT[zerotrust]
-
-    CP --> NA
-    CP --> ZT
-    DV --> NA
-
-    SW --> AU
-    DL --> AU
-    NA --> AU
-    CP --> AU
+    Device --> Policy
+    Device --> Asset
+    Policy --> Software
+    Policy --> Compliance
+    Compliance --> NAC
+    Compliance --> ZeroTrust
+    modules --> Audit
 ```
 
-## 7. 模块开发规范
+## 6. 开发规范
 
-1. 每个服务为 `backend/` 下独立 Maven 子模块，共享 `sentinel-common` 公共库
-2. 服务间 **禁止** 直接读对方数据库，仅通过 gRPC / OpenFeign / NATS
-3. 新增模块必须：proto 定义、OpenAPI 片段、Flyway 迁移、README
-4. 所有写操作产生审计事件，格式见 `com.sentinelhub.common.audit.AuditEvent`
+1. 新业务先在 `module.{name}` 实现 Service/Repository
+2. 按客户端在 `api.admin` / `api.app` / `api.agent` 添加 Controller
+3. 禁止跨 module 直接访问 Repository，通过 Service 接口调用
+4. 所有写操作调用 `module.audit.AuditService` 记录
+5. 数据库迁移：`server/src/main/resources/db/migration/`

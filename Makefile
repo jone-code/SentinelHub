@@ -5,7 +5,7 @@ help:
 	@echo "  make dev-up          - Start infrastructure (docker-compose)"
 	@echo "  make dev-down        - Stop infrastructure"
 	@echo "  make backend-build   - Build Java backend (Maven)"
-	@echo "  make backend-run     - Run gateway service"
+	@echo "  make backend-run     - Run unified API server"
 	@echo "  make agent-build     - Build Go agent"
 
 dev-up:
@@ -18,7 +18,7 @@ backend-build:
 	cd backend && ./mvnw clean package -DskipTests
 
 backend-run:
-	cd backend && ./mvnw -pl gateway spring-boot:run
+	cd backend && ./mvnw -pl server spring-boot:run
 
 agent-build:
 	go build -o bin/sentinel-agent ./agent/cmd/agent

@@ -20,26 +20,22 @@ services:
   - nats
   - clickhouse
   - minio
-  - gateway
-  - identity
-  - device
-  - asset
-  - audit
+  - sentinel-server    # 统一 API 服务
   - console (nginx 静态)
 ```
 
 启动：
 
 ```bash
-make dev-up      # 启动基础设施
-make dev-services # 启动平台服务
+make dev-up           # 启动基础设施
+make backend-run      # 启动 API 服务
 ```
 
 端口规划：
 
 | 服务 | 端口 |
 |------|------|
-| Gateway | 8080 |
+| sentinel-server | 8080 |
 | Console | 3000 |
 | PostgreSQL | 5432 |
 | Redis | 6379 |

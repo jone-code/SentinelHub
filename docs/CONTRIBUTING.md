@@ -1,69 +1,44 @@
 # 模块开发指南
 
+## 架构原则
+
+- **一个 API 服务**：`backend/server`，不拆微服务
+- **业务按包拆分**：`module.{name}` 实现业务逻辑
+- **三端 API 分层**：`api.admin` / `api.app` / `api.agent`
+
 ## 新模块 Checklist
 
-开发新功能模块前，请确认以下事项：
+- [ ] 在 `module/{name}/` 实现 Service、Repository、domain
+- [ ] 在 `api.admin` 添加管理端 Controller（如需要）
+- [ ] 在 `api.app` 添加移动端 Controller（如需要）
+- [ ] 在 `api.agent` 添加终端 Controller（如需要）
+- [ ] 编写 Flyway 迁移 `server/src/main/resources/db/migration/`
+- [ ] 写操作调用 `module.audit` 记录审计
 
-- [ ] 阅读 [04-module-design.md](../architecture/04-module-design.md) 中对应模块定义
-- [ ] 在 `backend/{module}/` 创建或扩展 Spring Boot 模块
-- [ ] 定义 `proto/{module}/v1/*.proto`（如需 gRPC）
-- [ ] 编写 Flyway 迁移脚本 `src/main/resources/db/migration/`
-- [ ] 实现 REST API（遵循 [06-api-design.md](../architecture/06-api-design.md)）
-- [ ] 发布 NATS 事件，审计事件使用 `com.sentinelhub.common.audit.AuditEvent`
-- [ ] 更新 `console/src/pages/{module}/`
-- [ ] 补充单元测试与 README
-
-## 服务目录结构
+## 目录结构
 
 ```
-backend/{module}/
-├── pom.xml
-├── src/main/java/com/sentinelhub/{module}/
-│   ├── {Module}Application.java    # Spring Boot 入口
-│   ├── config/                     # 配置类
-│   ├── controller/                 # REST 控制器
-│   ├── service/                    # 业务逻辑
-│   ├── repository/                 # 数据访问 (MyBatis-Plus Mapper)
-│   └── domain/                     # 实体与 DTO
-├── src/main/resources/
-│   ├── application.yml
-│   └── db/migration/               # Flyway SQL
-└── README.md
+backend/server/src/main/java/com/sentinelhub/
+├── api/
+│   ├── admin/          # PC 管理控制台 API
+│   ├── app/            # 手机 App API
+│   └── agent/          # PC Agent API
+└── module/
+    └── {name}/
+        ├── XxxService.java
+        ├── XxxRepository.java
+        └── domain/
 ```
 
-## 分支命名
-
-```
-feature/M03-device-registration
-feature/M07-software-blacklist
-```
-
-## 提交信息格式
-
-```
-feat(device): add agent registration endpoint
-fix(audit): correct ClickHouse batch insert
-docs(architecture): update NAC integration diagram
-```
-
-## 服务间通信规则
-
-1. **同步查询**：gRPC 或 OpenFeign（定义在 `proto/` 或 Feign Client 接口）
-2. **异步事件**：NATS JetStream，主题格式 `sentinel.{domain}.{action}.{tenant_id}`
-3. **禁止**：直接连接其他服务的数据库
-
-## Agent Enforcer 开发
-
-管控类模块需同时实现：
-
-1. 云端 `backend/{module}/` — 策略管理与事件处理（Java）
-2. Agent `agent/enforcers/{module}/` — 本地策略执行（Go）
-3. 策略 DSL 文档 — 在模块 README 中说明
-
-## 本地运行单个服务
+## 本地运行
 
 ```bash
 cd backend
-./mvnw -pl gateway spring-boot:run
-./mvnw -pl device spring-boot:run
+./mvnw -pl server spring-boot:run
 ```
+
+## 调用规则
+
+1. `api.*` → `module.*` Service，禁止 Controller 直连 Repository
+2. `module.*` 之间通过 Service 接口调用，禁止跨包访问 Repository
+3. 禁止 `api.admin` 与 `api.agent` 互相调用
