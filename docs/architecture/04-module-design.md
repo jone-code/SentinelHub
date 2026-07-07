@@ -6,20 +6,20 @@
 
 | 模块 ID | 服务名 | 目录 | 阶段 | 状态 |
 |---------|--------|------|------|------|
-| M01 | gateway | `services/gateway` | P0 | 骨架 |
-| M02 | identity | `services/identity` | P0 | 骨架 |
-| M03 | device | `services/device` | P0 | 骨架 |
-| M04 | asset | `services/asset` | P0 | 骨架 |
-| M05 | audit | `services/audit` | P0 | 骨架 |
-| M06 | policy | `services/policy` | P1 | 骨架 |
-| M07 | software | `services/software` | P1 | 骨架 |
-| M08 | compliance | `services/compliance` | P1 | 骨架 |
-| M09 | dlp | `services/dlp` | P2 | 骨架 |
-| M10 | nac | `services/nac` | P2 | 骨架 |
-| M11 | zerotrust | `services/zerotrust` | P3 | 骨架 |
-| M12 | mdm | `services/mdm` | P3 | 骨架 |
-| M13 | remote | `services/remote` | P3 | 骨架 |
-| M14 | ai | `services/ai` | P4 | 预留 |
+| M01 | gateway | `backend/gateway` | P0 | 骨架 |
+| M02 | identity | `backend/identity` | P0 | 骨架 |
+| M03 | device | `backend/device` | P0 | 骨架 |
+| M04 | asset | `backend/asset` | P0 | 骨架 |
+| M05 | audit | `backend/audit` | P0 | 骨架 |
+| M06 | policy | `backend/policy` | P1 | 骨架 |
+| M07 | software | `backend/software` | P1 | 骨架 |
+| M08 | compliance | `backend/compliance` | P1 | 骨架 |
+| M09 | dlp | `backend/dlp` | P2 | 骨架 |
+| M10 | nac | `backend/nac` | P2 | 骨架 |
+| M11 | zerotrust | `backend/zerotrust` | P3 | 骨架 |
+| M12 | mdm | `backend/mdm` | P3 | 骨架 |
+| M13 | remote | `backend/remote` | P3 | 骨架 |
+| M14 | ai | `backend/ai` | P4 | 预留 |
 | — | agent | `agent` | P0 | 骨架 |
 | — | console | `console` | P0 | 骨架 |
 
@@ -204,7 +204,7 @@ const (
 - VLAN 动态分配、隔离区
 
 **部署组件**
-- `services/nac`：策略与决策
+- `backend/nac`：策略与决策
 - `deploy/nac/radius`：FreeRADIUS 配置模板（可选）
 
 ---
@@ -252,7 +252,7 @@ const (
 **接入点**
 - 消费 ClickHouse 审计流
 - 提供 `POST /api/v1/ai/query` 供控制台调用
-- 插件接口：`pkg/ai/provider`
+- 插件接口：`backend/ai` 模块 SPI 扩展点
 
 ## 4. 终端 Agent 模块
 
@@ -325,7 +325,7 @@ graph LR
 
 ## 7. 模块开发规范
 
-1. 每个服务独立 `go.mod` 引用（通过 `go.work` 聚合）或统一 module `github.com/jone-code/SentinelHub`
-2. 服务间 **禁止** 直接读对方数据库，仅通过 gRPC / NATS
-3. 新增模块必须：proto 定义、OpenAPI 片段、迁移 SQL、README
-4. 所有写操作产生审计事件，格式见 `pkg/audit/event.go`
+1. 每个服务为 `backend/` 下独立 Gradle 子模块，共享 `common` 公共库
+2. 服务间 **禁止** 直接读对方数据库，仅通过 gRPC / OpenFeign / NATS
+3. 新增模块必须：proto 定义、OpenAPI 片段、Flyway 迁移、README
+4. 所有写操作产生审计事件，格式见 `com.sentinelhub.common.audit.AuditEvent`

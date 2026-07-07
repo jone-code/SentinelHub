@@ -197,7 +197,7 @@ proto/
 ## 9. OpenAPI
 
 - 聚合文档：`api/openapi.yaml`（由各领域 fragment 合并）
-- 每个服务维护 `services/{name}/api/openapi.yaml`
+- 每个服务维护 `backend/{name}/src/main/resources/openapi.yaml`
 - CI 校验 breaking change
 
 ## 10. 版本演进

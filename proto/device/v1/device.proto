@@ -2,7 +2,9 @@ syntax = "proto3";
 
 package device.v1;
 
-option go_package = "github.com/jone-code/SentinelHub/pkg/gen/device/v1;devicev1";
+option go_package = "github.com/jone-code/SentinelHub/proto/gen/device/v1;devicev1";
+option java_package = "com.sentinelhub.proto.device.v1";
+option java_multiple_files = true;
 
 import "common/v1/common.proto";
 

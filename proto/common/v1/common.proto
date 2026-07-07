@@ -2,7 +2,9 @@ syntax = "proto3";
 
 package common.v1;
 
-option go_package = "github.com/jone-code/SentinelHub/pkg/gen/common/v1;commonv1";
+option go_package = "github.com/jone-code/SentinelHub/proto/gen/common/v1;commonv1";
+option java_package = "com.sentinelhub.proto.common.v1";
+option java_multiple_files = true;
 
 // TenantScope identifies the tenant for multi-tenant operations.
 message TenantScope {

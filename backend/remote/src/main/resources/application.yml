@@ -1,0 +1,12 @@
+server:
+  port: 8092
+
+spring:
+  application:
+    name: sentinel-remote
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

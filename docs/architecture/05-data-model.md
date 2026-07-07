@@ -287,7 +287,7 @@ TTL timestamp + INTERVAL 365 DAY;
 
 ## 6. 迁移管理
 
-- 路径：`services/{name}/migrations/`
-- 工具：golang-migrate
+- 路径：`backend/{name}/src/main/resources/db/migration/`
+- 工具：Flyway
 - 命名：`000001_init.up.sql` / `000001_init.down.sql`
 - 共享基础表：`deploy/migrations/platform/`

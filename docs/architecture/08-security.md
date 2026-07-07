@@ -68,7 +68,7 @@
 ## 7. 安全开发生命周期
 
 - 依赖漏洞扫描：Dependabot / trivy 镜像扫描
-- SAST：golangci-lint security tags, semgrep
+- SAST：SpotBugs, semgrep, ESLint security
 - 密钥：禁止提交 `.env` 与私钥，gitleaks CI
 - 渗透测试：Major 版本发布前
 

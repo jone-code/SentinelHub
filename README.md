@@ -19,53 +19,44 @@
 | 远程控制 | 远程桌面、会话审计 | P3 |
 | AI 安全 | 异常检测、智能查询（预留） | P4 |
 
+## 技术栈
+
+| 层级 | 技术 |
+|------|------|
+| 后端 | Java 21, Spring Boot 3.3, Gradle, MyBatis-Plus |
+| 前端 | React 18, TypeScript, Ant Design |
+| Agent | Go 1.22+（跨平台终端） |
+| 存储 | PostgreSQL, Redis, ClickHouse, MinIO |
+| 消息 | NATS JetStream |
+
 ## 架构文档
 
-完整设计见 [docs/architecture/](./docs/architecture/)：
-
-- [01-overview.md](./docs/architecture/01-overview.md) — 整体概览
-- [02-technology-stack.md](./docs/architecture/02-technology-stack.md) — 技术选型
-- [03-system-architecture.md](./docs/architecture/03-system-architecture.md) — 系统架构
-- [04-module-design.md](./docs/architecture/04-module-design.md) — 模块设计
-- [05-data-model.md](./docs/architecture/05-data-model.md) — 数据模型
-- [06-api-design.md](./docs/architecture/06-api-design.md) — API 规范
-- [07-deployment.md](./docs/architecture/07-deployment.md) — 部署架构
-- [08-security.md](./docs/architecture/08-security.md) — 安全架构
-- [09-roadmap.md](./docs/architecture/09-roadmap.md) — 建设路线图
+完整设计见 [docs/architecture/](./docs/architecture/)。
 
 ## 仓库结构
 
 ```
 SentinelHub/
+├── backend/            # Java 后端（Spring Boot 多模块）
+│   ├── common/         # 公共库
+│   ├── gateway/        # API 网关 :8080
+│   ├── identity/       # 身份租户 :8081
+│   ├── device/         # 设备管控 :8082
+│   └── ...             # 其他业务模块
 ├── agent/              # 终端 Agent（Go）
 ├── console/            # 管理控制台（React）
 ├── deploy/             # Docker Compose / Helm / 迁移脚本
 ├── docs/               # 架构与设计文档
-├── pkg/                # 跨服务共享库
-├── proto/              # Protobuf / gRPC 定义
-└── services/           # 后端微服务
-    ├── gateway/
-    ├── identity/
-    ├── device/
-    ├── asset/
-    ├── audit/
-    ├── policy/
-    ├── software/
-    ├── compliance/
-    ├── dlp/
-    ├── nac/
-    ├── zerotrust/
-    ├── mdm/
-    ├── remote/
-    └── ai/
+└── proto/              # Protobuf / gRPC 定义
 ```
 
 ## 快速开始
 
 ### 前置要求
 
-- Go 1.22+
-- Node.js 20+
+- Java 21+
+- Go 1.22+（仅 Agent 开发）
+- Node.js 20+（控制台）
 - Docker & Docker Compose
 
 ### 启动开发环境
@@ -74,24 +65,23 @@ SentinelHub/
 # 启动基础设施（PostgreSQL, Redis, NATS, ClickHouse, MinIO）
 make dev-up
 
-# 构建所有服务
-make build
+# 构建后端
+cd backend && ./gradlew build
 
-# 启动平台服务（开发模式）
-make dev-services
+# 启动网关
+./gradlew :gateway:bootRun
+
+# 启动控制台
+cd console && npm install && npm run dev
 ```
 
 访问：
 - 控制台：http://localhost:3000
-- API 网关：http://localhost:8080
-- API 健康检查：http://localhost:8080/health
+- API 网关：http://localhost:8080/health
 
 ## 开发规范
 
-- 模块开发顺序见 [09-roadmap.md](./docs/architecture/09-roadmap.md)
-- 每个服务需包含：`cmd/`、`internal/`、`migrations/`、`README.md`
-- 服务间通过 gRPC / NATS 通信，禁止跨库访问
-- 所有安全操作必须产生审计事件
+见 [docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md)。
 
 ## License
 
