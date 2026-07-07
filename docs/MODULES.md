@@ -34,8 +34,9 @@
 
 | 目录 | 技术 | 说明 |
 |------|------|------|
+| `console/` | React + Ant Design | PC 管理控制台 |
+| `mobile/` | React Native + Expo | 手机管理 App（规划） |
 | `agent/` | Go | PC 终端 Agent |
-| `console/` | React | Web 管理控制台 |
 
 ## 下一步（P0）
 

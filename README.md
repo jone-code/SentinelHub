@@ -17,9 +17,12 @@
 | 层级 | 技术 |
 |------|------|
 | 后端 | Java 21, Spring Boot 3.3, Maven |
-| 前端 | React 18, TypeScript, Ant Design |
-| Agent | Go 1.22+ |
+| 管理控制台 | React 18, TypeScript, Vite, Ant Design |
+| 手机 App | React Native, Expo, TypeScript |
+| PC Agent | Go 1.22+ |
 | 存储 | MySQL, Redis, ClickHouse, MinIO |
+
+> 客户端详细说明见 [docs/architecture/10-client-technology-stack.md](./docs/architecture/10-client-technology-stack.md)
 
 ## 仓库结构
 
@@ -32,8 +35,9 @@ SentinelHub/
 │       ├── api/app/    # 移动端 API
 │       ├── api/agent/  # 终端 API
 │       └── module/     # 业务模块（device, asset, ...）
+├── console/            # PC 管理控制台（React）
+├── mobile/             # 手机管理 App（React Native，规划中）
 ├── agent/              # PC 终端 Agent（Go）
-├── console/            # Web 管理控制台（React）
 ├── deploy/             # Docker Compose / 迁移脚本
 └── docs/               # 架构文档
 ```

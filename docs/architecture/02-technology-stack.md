@@ -79,11 +79,15 @@ backend/
 | ClickHouse | 审计日志、遥测 | clickhouse-jdbc 批量写入 |
 | MinIO | 安装包、取证文件 | AWS S3 SDK |
 
-### 3.5 前端
+### 3.5 客户端
 
-- **Ant Design Pro** 风格管理台
-- **React Query** 管理服务端状态
-- **ECharts** 合规与资产可视化
+三类客户端技术栈详见 [10-client-technology-stack.md](./10-client-technology-stack.md)。
+
+| 客户端 | 目录 | 技术 |
+|--------|------|------|
+| 管理控制台（PC） | `console/` | React 18 + TypeScript + Vite + Ant Design |
+| 手机管理 App | `mobile/` | React Native + Expo + TypeScript |
+| PC 终端 Agent | `agent/` | Go 1.22+ |
 
 ### 3.6 Agent：Go
 
@@ -107,6 +111,9 @@ agent/
 
 | 依赖 | 版本 |
 |------|------|
+| React | 18.x |
+| React Native (Expo) | 0.76.x / SDK 52 |
+| Go (Agent) | 1.22+ |
 | Java | 21 (LTS) |
 | Spring Boot | 3.3.5 |
 | Spring Cloud | 2023.0.x (按需引入) |

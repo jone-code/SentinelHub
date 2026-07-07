@@ -1,8 +1,23 @@
 # SentinelHub 管理控制台
 
-React + TypeScript + Ant Design 管理后台。
+PC 端 Web 管理后台，对接 `/api/admin/v1`。
 
-## 页面模块（按路线图）
+> 详细技术栈见 [docs/architecture/10-client-technology-stack.md](../docs/architecture/10-client-technology-stack.md)
+
+## 技术栈
+
+| 类别 | 技术 | 版本 |
+|------|------|------|
+| 框架 | React | 18.x |
+| 语言 | TypeScript | 5.x |
+| 构建 | Vite | 5.x |
+| UI | Ant Design | 5.x |
+| 路由 | React Router | 6.x |
+| 状态（规划） | Zustand + TanStack Query | — |
+| 图表（规划） | ECharts | — |
+| HTTP（规划） | Axios | — |
+
+## 页面模块
 
 | 页面 | 路径 | 阶段 |
 |------|------|------|
@@ -13,16 +28,15 @@ React + TypeScript + Ant Design 管理后台。
 | 策略管理 | `/policies` | P1 |
 | 合规检查 | `/compliance` | P1 |
 | DLP | `/dlp` | P2 |
-| NAC | `/nac` | P2 |
-| 零信任 | `/zerotrust` | P3 |
-| MDM | `/mdm` | P3 |
-| 远程控制 | `/remote` | P3 |
 
 ## 开发
 
 ```bash
 npm install
-npm run dev
+npm run dev       # http://localhost:3000，API 代理至 :8080
+npm run build     # 构建静态资源 dist/
 ```
 
-API 请求通过 Vite 代理转发至 Gateway (`localhost:8080`)。
+## 浏览器要求
+
+Chrome 90+、Edge 90+、Firefox 90+，最低分辨率 1280×720。
