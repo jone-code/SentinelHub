@@ -4,18 +4,16 @@ import com.sentinelhub.common.dto.ApiResponse;
 import com.sentinelhub.module.asset.AssetService;
 import com.sentinelhub.module.device.DeviceService;
 import com.sentinelhub.module.identity.IdentityService;
+import com.sentinelhub.module.policy.PolicyService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Collections;
 import java.util.Map;
 
-/**
- * PC client background service API — register, heartbeat, report.
- */
 @RestController
 @RequestMapping("/api/client/v1/service")
 public class ClientServiceController {
@@ -23,12 +21,14 @@ public class ClientServiceController {
     private final IdentityService identityService;
     private final DeviceService deviceService;
     private final AssetService assetService;
+    private final PolicyService policyService;
 
     public ClientServiceController(IdentityService identityService, DeviceService deviceService,
-                                   AssetService assetService) {
+                                   AssetService assetService, PolicyService policyService) {
         this.identityService = identityService;
         this.deviceService = deviceService;
         this.assetService = assetService;
+        this.policyService = policyService;
     }
 
     @GetMapping("/info")
@@ -55,8 +55,15 @@ public class ClientServiceController {
         if (clientId == null || clientId.isBlank()) {
             throw new IllegalArgumentException("client_id required");
         }
-        String version = stringVal(body.get("version"));
         return ApiResponse.ok(deviceService.heartbeatGlobal(clientId));
+    }
+
+    @GetMapping("/policy-bundle")
+    public ApiResponse<Map<String, Object>> policyBundle(@RequestParam("client_id") String clientId) {
+        if (clientId == null || clientId.isBlank()) {
+            throw new IllegalArgumentException("client_id required");
+        }
+        return ApiResponse.ok(policyService.getFullBundleForClient(clientId));
     }
 
     @PostMapping("/report/assets")

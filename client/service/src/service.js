@@ -2,6 +2,7 @@ import { collectAssets } from './collectors/index.js';
 import { resolveNativeBin } from './native-bridge.js';
 import { LocalServer } from './local-server.js';
 import { loadClientState, saveClientState } from './state.js';
+import { loadPolicyState, syncPolicy } from './policy.js';
 
 /**
  * PC client background service — orchestration layer.
@@ -29,6 +30,8 @@ export class ClientService {
     };
     /** @type {object | null} */
     this.assets = null;
+    /** @type {object | null} */
+    this.policy = null;
   }
 
   getLocalStatus() {
@@ -48,6 +51,10 @@ export class ClientService {
       assets: {
         collected_at: this.state.lastAssetAt,
         software_count: this.assets?.software?.length ?? 0,
+      },
+      policy: {
+        version: this.policy?.version ?? null,
+        hash: this.policy?.hash ?? null,
       },
       started_at: this.state.startedAt,
     };
@@ -74,8 +81,11 @@ export class ClientService {
       port: this.config.localPort,
       getStatus: () => this.getLocalStatus(),
       getAssets: () => this.assets,
+      getPolicy: () => this.policy,
     });
     await this.localServer.start();
+
+    this.policy = await loadPolicyState();
 
     const saved = await loadClientState();
     if (saved.client_id) {
@@ -163,6 +173,10 @@ export class ClientService {
       this.state.lastHeartbeatAt = new Date().toISOString();
       this.state.lastHeartbeatOk = res.ok;
       this.state.cloudConnected = res.ok;
+      const bundleSummary = body?.data?.policy_bundle;
+      if (bundleSummary && this.state.clientId) {
+        this.policy = await syncPolicy(this.config, this.state.clientId, bundleSummary);
+      }
       console.log('[sentinel-service] heartbeat ok', body?.data?.server_time ?? res.status);
     } catch (err) {
       this.state.lastHeartbeatAt = new Date().toISOString();

@@ -2,6 +2,7 @@ package com.sentinelhub.module.device;
 
 import com.sentinelhub.module.audit.AuditService;
 import com.sentinelhub.module.device.domain.Device;
+import com.sentinelhub.module.policy.PolicyService;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -18,10 +19,13 @@ public class DeviceService {
 
     private final DeviceRepository deviceRepository;
     private final AuditService auditService;
+    private final PolicyService policyService;
 
-    public DeviceService(DeviceRepository deviceRepository, AuditService auditService) {
+    public DeviceService(DeviceRepository deviceRepository, AuditService auditService,
+                         PolicyService policyService) {
         this.deviceRepository = deviceRepository;
         this.auditService = auditService;
+        this.policyService = policyService;
     }
 
     public Map<String, Object> register(String tenantId, String tenantToken, Map<String, Object> body) {
@@ -63,10 +67,14 @@ public class DeviceService {
     public Map<String, Object> heartbeatGlobal(String clientId) {
         deviceRepository.findByAgentIdAny(clientId).ifPresent(device ->
                 deviceRepository.updateHeartbeat(device.tenantId(), clientId, null, null, null));
-        return Map.of(
-                "server_time", Instant.now().toString(),
-                "commands", List.of()
-        );
+        Map<String, Object> response = new HashMap<>();
+        response.put("server_time", Instant.now().toString());
+        response.put("commands", List.of());
+        Map<String, Object> bundle = policyService.getBundleSummaryForClient(clientId);
+        if (!bundle.isEmpty()) {
+            response.put("policy_bundle", bundle);
+        }
+        return response;
     }
 
     public void touchHeartbeat(String tenantId, String clientId) {

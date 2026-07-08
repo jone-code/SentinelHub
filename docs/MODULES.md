@@ -18,11 +18,11 @@
 | `module.device` | P0 | **注册/心跳/列表** |
 | `module.asset` | P0 | **资产上报/入库** |
 | `module.audit` | P0 | **审计写入/查询** |
-| `module.policy` | P1 | 骨架 |
+| `module.policy` | P1 | **CRUD/发布/策略包下发** |
 | 其他模块 | P1~P4 | 骨架 |
 
-## 下一步（P1 准备）
+## 下一步（P1 继续）
 
-1. `module.policy` 策略 CRUD 与下发
-2. Flutter 推送通知（手机端）
-3. 运行 `./tool/create_platforms.sh` 生成 iOS/Android/桌面工程并发版
+1. Rust enforcer — 软件黑名单进程检测
+2. `module.compliance` 合规扫描与真实评分
+3. 策略作用域（按设备组/组织）

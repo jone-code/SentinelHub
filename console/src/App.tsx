@@ -4,6 +4,7 @@ import Dashboard from './pages/dashboard';
 import Devices from './pages/devices';
 import Audit from './pages/audit';
 import Login from './pages/login';
+import Policies from './pages/policies';
 import { getToken, clearToken } from './api/client';
 
 const { Header, Sider, Content } = Layout;
@@ -53,6 +54,7 @@ function AppLayout() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/devices" element={<Devices />} />
+            <Route path="/policies" element={<Policies />} />
             <Route path="/audit" element={<Audit />} />
             <Route path="*" element={<Placeholder title="模块开发中" />} />
           </Routes>

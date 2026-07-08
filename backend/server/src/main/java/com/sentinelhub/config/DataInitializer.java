@@ -2,6 +2,7 @@ package com.sentinelhub.config;
 
 import com.sentinelhub.module.identity.UserRepository;
 import com.sentinelhub.module.identity.domain.User;
+import com.sentinelhub.module.policy.PolicyService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -19,12 +20,14 @@ public class DataInitializer implements ApplicationRunner {
     private final SeedProperties seedProperties;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PolicyService policyService;
 
     public DataInitializer(SeedProperties seedProperties, UserRepository userRepository,
-                           PasswordEncoder passwordEncoder) {
+                           PasswordEncoder passwordEncoder, PolicyService policyService) {
         this.seedProperties = seedProperties;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.policyService = policyService;
     }
 
     @Override
@@ -53,6 +56,8 @@ public class DataInitializer implements ApplicationRunner {
 
         String roleId = userRepository.insertRole(tenantId, "super_admin", "Super Admin");
         userRepository.assignRole(userId, roleId);
+
+        policyService.seedDemoSoftwarePolicy(tenantId, userId);
 
         log.info("Seeded demo tenant '{}' admin={} registration_token={}",
                 seedProperties.tenantSlug(), seedProperties.adminEmail(), seedProperties.registrationToken());
