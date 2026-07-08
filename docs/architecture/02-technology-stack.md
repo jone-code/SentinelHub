@@ -4,7 +4,7 @@
 
 - **私有化友好**：核心组件可离线部署，不依赖公有云专有服务
 - **跨平台**：PC 客户端需覆盖 Windows / macOS / Linux
-- **可维护**：后端 Java 生态；PC 客户端 UI 用 Electron+React，后台服务用 Go
+- **可维护**：后端 Java；客户端 Flutter 统一手机+PC；PC 后台服务用 Go
 
 ## 2. 技术栈总览
 
@@ -16,7 +16,8 @@
 │ 统一 API 服务 │ Spring Boot 3.3 单体 + 业务模块分包 (Java 21)        │
 │ API 通道     │ admin / app / client 三端 REST API                 │
 │ 业务模块     │ Spring 包结构 module.* (非独立微服务)                  │
-│ PC 安全客户端 │ Electron + React (UI) + Go (后台服务)               │
+│ 统一客户端   │ Flutter 3.24（手机 iOS/Android + PC 桌面）            │
+│ PC 后台服务  │ Go 1.22+（仅桌面端常驻）                               │
 │ 关系型数据库 │ MySQL 8.4                                          │
 │ 缓存         │ Redis 7                                            │
 │ 消息队列     │ NATS JetStream                                     │
@@ -84,21 +85,20 @@ backend/
 
 | 客户端 | 目录 | 技术 |
 |--------|------|------|
-| 管理控制台（PC） | `console/` | React 18 + TypeScript + Vite + Ant Design |
-| 手机管理 App | `mobile/` | React Native + Expo + TypeScript |
-| PC 安全客户端 | `client/` | Electron + React (UI) + Go (后台服务) |
+| 管理控制台（PC Web） | `console/` | React + TypeScript + Ant Design |
+| **手机 + PC 客户端** | `client/` | **Flutter**（Dart） |
+| PC 后台服务（仅桌面） | `client/service/` | Go |
 
-### 3.6 PC 客户端架构
+### 3.6 统一客户端架构（Flutter）
 
-PC 安全客户端 = **Electron 桌面 UI** + **Go 后台服务**：
+手机与 PC **共用** `client/lib/`，编译到不同平台；PC 桌面另含 Go 后台服务：
 
 ```
 client/
-├── electron/ + src/    # Electron + React 页面（首页、合规、设置等）
-└── service/            # Go 后台服务（心跳、策略执行、数据采集）
-    ├── core/
-    ├── collectors/
-    └── enforcers/
+├── lib/                # Flutter UI（iOS/Android/Win/Mac/Linux 共享）
+├── android/ ios/       # 移动端工程
+├── windows/ macos/ linux/
+└── service/            # PC 专用 Go 后台服务
 ```
 
 详见 [10-client-technology-stack.md](./10-client-technology-stack.md)。
@@ -107,10 +107,10 @@ client/
 
 | 依赖 | 版本 |
 |------|------|
-| React | 18.x |
-| React Native (Expo) | 0.76.x / SDK 52 |
-| Electron | 33.x |
-| Go (客户端后台服务) | 1.22+ |
+| Flutter | 3.24+ |
+| Dart | 3.5+ |
+| Go (PC 后台服务) | 1.22+ |
+| React (管理控制台) | 18.x |
 | Java | 21 (LTS) |
 | Spring Boot | 3.3.5 |
 | Spring Cloud | 2023.0.x (按需引入) |

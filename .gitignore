@@ -21,7 +21,9 @@ agent/build/
 node_modules/
 console/dist/
 client/dist/
-client/node_modules/
+client/.dart_tool/
+client/build/
+client/.flutter-plugins-dependencies
 console/.vite/
 *.log
 

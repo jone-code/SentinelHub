@@ -1,6 +1,6 @@
 # 客户端技术栈
 
-SentinelHub 有三类客户端，分别对接统一 API 服务的不同通道。
+SentinelHub 有两类**用户端客户端** + 一类**管理端**：
 
 ```
                     ┌─────────────────────────────────┐
@@ -10,211 +10,206 @@ SentinelHub 有三类客户端，分别对接统一 API 服务的不同通道。
             │                   │                   │
    /api/admin/v1        /api/app/v1        /api/client/v1
             │                   │                   │
-    ┌───────▼───────┐   ┌───────▼───────┐   ┌───────▼───────┐
-    │  管理控制台     │   │  手机管理 App  │   │  PC 安全客户端  │
-    │  console/      │   │  mobile/       │   │  client/       │
-    │  PC 浏览器      │   │  iOS/Android   │   │  桌面应用+页面  │
-    └───────────────┘   └───────────────┘   └───────────────┘
+    ┌───────▼───────┐   ┌───────▼───────────────────────┐
+    │  管理控制台     │   │   统一客户端 client/ (Flutter)  │
+    │  console/      │   │   ┌─────────┬─────────┐        │
+    │  PC 浏览器      │   │   │ 手机端   │  PC 端   │        │
+    └───────────────┘   │   │iOS/Andrd│Win/Mac/Lx│        │
+                        │   └─────────┴────┬────┘        │
+                        │                  │ Go 后台服务  │
+                        └──────────────────┴──────────────┘
 ```
 
 ---
 
 ## 1. 三端总览
 
-| 客户端 | 目录 | 运行环境 | API 通道 | 阶段 |
-|--------|------|----------|----------|------|
-| 管理控制台 | `console/` | PC 浏览器 | `/api/admin/v1` | P0 |
-| 手机管理 App | `mobile/` | iOS / Android | `/api/app/v1` | P0（API）/ P1（App） |
-| **PC 安全客户端** | `client/` | Windows / macOS / Linux 桌面应用 | `/api/client/v1` | P0 |
+| 客户端 | 目录 | 运行环境 | 技术 | API |
+|--------|------|----------|------|-----|
+| 管理控制台 | `console/` | PC 浏览器 | React + Ant Design | `/api/admin/v1` |
+| **统一客户端** | `client/` | **iOS / Android / Win / macOS / Linux** | **Flutter** | 见下表 |
+| PC 后台服务 | `client/service/` | 仅桌面端 | Go | `/api/client/v1/service` |
+
+### 统一客户端 API 分工
+
+| 平台 | UI 调用的 API | 说明 |
+|------|---------------|------|
+| 手机 iOS/Android | `/api/app/v1` | 移动端精简接口 |
+| PC 桌面 Flutter UI | `/api/client/v1` | 本机状态、合规、通知 |
+| PC Go 后台服务 | `/api/client/v1/service` | 注册、心跳、上报（无界面） |
 
 ---
 
 ## 2. 管理控制台（PC Web）— `console/`
 
-面向安全管理员、IT 运维，浏览器访问，完整管理能力。
-
-| 类别 | 技术 | 版本 |
-|------|------|------|
-| 框架 | React | 18.x |
-| 语言 | TypeScript | 5.x |
-| 构建 | Vite | 5.x |
-| UI | Ant Design | 5.x |
-| 路由 | React Router | 6.x |
-| HTTP（规划） | Axios + TanStack Query | — |
-
-```bash
-cd console && npm install && npm run dev   # http://localhost:3000
-```
-
----
-
-## 3. 手机管理 App — `mobile/`
-
-面向管理员移动办公，设备概览与告警处置。
+面向安全管理员，浏览器访问，**与客户端技术栈独立**。
 
 | 类别 | 技术 |
 |------|------|
-| 框架 | React Native + Expo |
-| 语言 | TypeScript |
-| UI | React Native Paper |
-| API | `/api/app/v1` |
+| 框架 | React 18 + TypeScript |
+| 构建 | Vite |
+| UI | Ant Design 5 |
 
-**状态**：规划阶段（P1 开发）。
+```bash
+cd console && npm install && npm run dev
+```
 
 ---
 
-## 4. PC 安全客户端 — `client/`
+## 3. 统一客户端 — `client/`（Flutter）
 
-安装在员工电脑上的**桌面应用程序**，包含 **用户界面（页面）** 和 **后台服务** 两部分，不是无界面的纯 Agent。
+**一套代码，编译到手机 + PC 桌面。**
 
-### 4.1 整体架构
+### 3.1 为什么选 Flutter
 
-```
-┌─────────────────────────────────────────────────────┐
-│              SentinelHub PC 客户端 (client/)          │
-│  ┌─────────────────────┐  ┌────────────────────────┐ │
-│  │   Electron 主进程    │  │   Go 后台服务 (service/) │ │
-│  │   窗口 / 托盘 / 启动  │──│   心跳 / 策略 / 采集    │ │
-│  └──────────┬──────────┘  └───────────┬────────────┘ │
-│             │                          │               │
-│  ┌──────────▼──────────┐               │               │
-│  │  React UI（渲染进程） │               │               │
-│  │  首页 / 合规 / 设置   │               │               │
-│  └─────────────────────┘               │               │
-└─────────────────────────┬──────────────┴───────────────┘
-                          │ HTTPS
-              ┌───────────▼───────────┐
-              │  /api/client/v1        │  ← UI 页面数据
-              │  /api/client/v1/service │  ← 后台服务通信
-              └───────────────────────┘
-```
+| 优势 | 说明 |
+|------|------|
+| **一套代码多端** | iOS、Android、Windows、macOS、Linux 共用 `lib/` |
+| **性能与体积** | 比 Electron 轻，无 Chromium 捆绑 |
+| **UI 一致** | 手机与 PC 体验统一，自适应布局 |
+| **国内生态成熟** | 组件、文档、人才储备充足 |
 
-### 4.2 UI 层技术选型
+### 3.2 技术选型
 
 | 类别 | 技术 | 版本 | 说明 |
 |------|------|------|------|
-| 桌面壳 | **Electron** | 33.x | 跨平台桌面窗口、系统托盘 |
-| 框架 | React | 18.x | 与控制台技术栈一致 |
-| 语言 | TypeScript | 5.x | 类型安全 |
-| 构建 | Vite | 5.x | UI 构建 |
-| UI 组件 | Ant Design | 5.x | 与控制台风格统一 |
-| 路由 | React Router | 6.x | 页面导航 |
-| 打包（规划） | electron-builder | — | MSI / PKG / DEB |
+| 框架 | **Flutter** | 3.24+ | 跨平台 UI |
+| 语言 | **Dart** | 3.5+ | |
+| 状态管理 | Riverpod | 2.x | |
+| 路由 | go_router | 14.x | 声明式路由 |
+| HTTP | dio | 5.x | API 请求 |
+| UI | Material 3 | — | 自适应手机/桌面 |
 
-### 4.3 后台服务技术选型
+### 3.3 平台适配策略
 
-| 类别 | 技术 | 说明 |
-|------|------|------|
-| 语言 | Go 1.22+ | 低资源占用，适合常驻后台 |
-| 通信 | HTTPS + mTLS | 对接 `/api/client/v1/service` |
-| 协议 | JSON / Protobuf | `proto/agent/`（服务协议） |
-| 本地存储 | BoltDB / SQLite（规划） | 策略缓存、离线队列 |
-| 运行方式 | 系统服务 + Electron 拉起 | 关闭窗口后仍可后台运行 |
+```dart
+// lib/platform/platform_info.dart
+PlatformInfo.isDesktop  → NavigationRail 侧边栏
+PlatformInfo.isMobile     → NavigationBar 底部导航
+PlatformInfo.apiPrefix    → /api/client/v1 或 /api/app/v1
+```
 
-### 4.4 客户端页面
+| 平台 | 导航布局 | API 前缀 |
+|------|----------|----------|
+| iOS / Android | 底部导航栏 | `/api/app/v1` |
+| Windows / macOS / Linux | 左侧导航栏 | `/api/client/v1` |
 
-| 页面 | 路径 | 功能 | 对接 API |
-|------|------|------|----------|
-| 首页 | `/` | 合规评分、待处理项、连接状态 | `GET /api/client/v1/status` |
-| 合规状态 | `/compliance` | 基线检查项明细 | `GET /api/client/v1/compliance` |
-| 本机信息 | `/device` | 主机名、OS、版本 | `GET /api/client/v1/device`（规划） |
-| 安全通知 | `/notifications` | DLP 告警、策略通知 | `GET /api/client/v1/notifications`（规划） |
-| 设置 | `/settings` | 服务器地址、自启动 | 本地配置 |
+### 3.4 共享页面
 
-### 4.5 目录结构
+| 页面 | 路由 | 手机 | PC |
+|------|------|------|-----|
+| 首页 | `/` | ✅ | ✅ |
+| 合规状态 | `/compliance` | ✅ | ✅ |
+| 本机信息 | `/device` | ✅ | ✅ |
+| 安全通知 | `/notifications` | ✅ | ✅ |
+| 设置 | `/settings` | ✅ | ✅ |
+
+### 3.5 目录结构
 
 ```
 client/
-├── package.json
-├── electron/
-│   ├── main.js             # 主进程：窗口、托盘、启动 Go 服务
-│   └── preload.js
-├── src/                    # React UI
-│   ├── App.tsx
-│   └── pages/
-│       ├── home/
-│       ├── compliance/
-│       ├── device/
-│       ├── notifications/
-│       └── settings/
-└── service/                # Go 后台服务
-    ├── cmd/service/
-    ├── core/
-    ├── transport/
-    ├── collectors/
-    ├── enforcers/
-    └── platform/
+├── pubspec.yaml
+├── lib/
+│   ├── main.dart
+│   ├── app.dart              # 路由 + 自适应 Shell
+│   ├── api/
+│   │   └── api_client.dart   # 按平台切换 API 前缀
+│   ├── pages/
+│   │   ├── home/
+│   │   ├── compliance/
+│   │   ├── device/
+│   │   ├── notifications/
+│   │   └── settings/
+│   └── platform/
+│       └── platform_info.dart
+├── android/                    # Android 工程
+├── ios/                        # iOS 工程
+├── windows/                    # Windows 工程
+├── macos/                      # macOS 工程
+├── linux/                      # Linux 工程
+└── service/                    # PC 专用 Go 后台服务
 ```
 
-### 4.6 API 对接
-
-**UI 接口**（`/api/client/v1`）— 供桌面页面展示：
-
-| Method | Path | 说明 |
-|--------|------|------|
-| GET | `/api/client/v1/status` | 安全状态概览 |
-| GET | `/api/client/v1/compliance` | 合规检查明细 |
-| GET | `/api/client/v1/notifications` | 通知列表（规划） |
-
-**服务接口**（`/api/client/v1/service`）— 供 Go 后台服务：
-
-| Method | Path | 说明 |
-|--------|------|------|
-| POST | `/api/client/v1/service/register` | 客户端注册 |
-| POST | `/api/client/v1/service/heartbeat` | 心跳 |
-| POST | `/api/client/v1/service/report/assets` | 资产上报 |
-| POST | `/api/client/v1/service/report/events` | 事件上报 |
-
-### 4.7 开发与构建
+### 3.6 开发与构建
 
 ```bash
-# UI 开发
-cd client && npm install && npm run dev
+cd client
+flutter pub get
 
-# 后台服务
+# 开发
+flutter run -d windows
+flutter run -d android
+
+# 发布构建
+flutter build apk --release
+flutter build ios --release
+flutter build windows --release
+flutter build macos --release
+flutter build linux --release
+```
+
+### 3.7 支持平台
+
+| 平台 | 最低版本 |
+|------|----------|
+| iOS | 13.0+ |
+| Android | API 24（Android 7.0）+ |
+| Windows | 10+ |
+| macOS | 11+ |
+| Linux | 主流发行版（glibc 2.27+） |
+
+---
+
+## 4. PC 后台服务 — `client/service/`（Go）
+
+**仅桌面端（Windows/macOS/Linux）需要**，与 Flutter UI 配合安装。
+
+| 职责 | Flutter UI | Go 服务 |
+|------|------------|---------|
+| 展示合规分数 | ✅ | |
+| 心跳 / 注册 | | ✅ |
+| 策略执行 | | ✅ |
+| 资产采集 | | ✅ |
+| DLP / 管控 | | ✅ |
+
+员工关掉 Flutter 窗口后，Go 服务继续常驻运行。
+
+```bash
 cd client/service
 CLIENT_SERVER_URL=http://localhost:8080 go run ./cmd/service
 ```
-
-### 4.8 支持平台
-
-| 平台 | UI | 后台服务 | 安装包 |
-|------|-----|----------|--------|
-| Windows 10/11 | Electron | Go service | `.msi` |
-| macOS 12+ | Electron | Go service | `.pkg` |
-| Linux | Electron | Go service | `.deb` / `.rpm` |
-
-### 4.9 与管理控制台的区别
-
-| 维度 | 管理控制台 | PC 安全客户端 |
-|------|------------|---------------|
-| 用户 | 安全管理员 / IT | 普通员工 |
-| 形态 | 浏览器网页 | 桌面应用（有窗口） |
-| 能力 | 管理全部设备 | 只看本机状态 |
-| 后台 | 无 | Go 服务常驻（策略执行） |
-| API | `/api/admin/v1` | `/api/client/v1` |
 
 ---
 
 ## 5. 三端技术对比
 
-| 维度 | 管理控制台 | 手机 App | PC 安全客户端 |
-|------|------------|----------|---------------|
-| **形态** | Web 网页 | 原生 App | 桌面应用 + 后台服务 |
-| **语言** | TypeScript | TypeScript | TypeScript (UI) + Go (服务) |
-| **框架** | React + Vite | React Native + Expo | Electron + React |
-| **有页面** | 是 | 是 | **是** |
-| **API** | `/api/admin/v1` | `/api/app/v1` | `/api/client/v1` |
-| **认证** | JWT | JWT | mTLS（服务）+ 本机会话（UI） |
-| **分发** | Web 部署 | App Store / APK | MSI / PKG / DEB |
+| 维度 | 管理控制台 | 统一客户端（Flutter） | PC Go 服务 |
+|------|------------|----------------------|------------|
+| **用户** | 管理员 | 员工 / 管理员（移动） | 无界面 |
+| **形态** | 浏览器 | 手机 App + 桌面应用 | 系统后台进程 |
+| **语言** | TypeScript | Dart | Go |
+| **平台** | Web | iOS/Android/Win/Mac/Linux | Win/Mac/Linux |
+| **API** | `/api/admin/v1` | `/api/app/v1` 或 `/api/client/v1` | `/api/client/v1/service` |
 
 ---
 
-## 6. 开发优先级
+## 6. 与管理控制台的分工
 
-| 阶段 | 客户端 | 交付 |
-|------|--------|------|
-| P0 | PC 客户端 UI | 首页、合规、本机信息、设置页面 |
-| P0 | PC 客户端服务 | 注册、心跳、资产采集 |
-| P0 | 管理控制台 | 登录、设备列表、审计 |
-| P1 | 手机 App | 设备概览、告警 |
+| 能力 | 管理控制台 (React) | 统一客户端 (Flutter) |
+|------|-------------------|----------------------|
+| 管理全部设备 | ✅ | ❌ |
+| 策略编辑 | ✅ | ❌（仅查看本机） |
+| 本机合规状态 | ❌ | ✅ |
+| 移动查看告警 | ❌ | ✅（手机） |
+| 审计查询 | ✅ | ❌ |
+
+---
+
+## 7. 开发优先级
+
+| 阶段 | 交付 |
+|------|------|
+| P0 | Flutter 骨架 + 共享页面；PC Go 服务注册/心跳 |
+| P0 | 管理控制台登录、设备列表 |
+| P1 | Flutter 对接真实 API；推送通知（手机） |
+| P1 | 管理控制台策略、合规 |

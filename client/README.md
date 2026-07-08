@@ -1,6 +1,6 @@
-# SentinelHub PC 安全客户端
+# SentinelHub 统一客户端（Flutter）
 
-安装在员工 PC（Windows / macOS / Linux）上的**桌面客户端**，包含用户界面和后台服务两部分。
+**手机端（iOS/Android）+ PC 端（Windows/macOS/Linux）** 共用一套 Flutter 代码。
 
 > 技术栈详见 [docs/architecture/10-client-technology-stack.md](../docs/architecture/10-client-technology-stack.md)
 
@@ -8,63 +8,60 @@
 
 ```
 client/
-├── electron/           # Electron 主进程（窗口、托盘、启动后台服务）
-├── src/                # React UI 页面
-│   └── pages/
-│       ├── home/           # 安全状态概览
-│       ├── compliance/     # 合规状态
-│       ├── device/         # 本机信息
-│       ├── notifications/  # 安全通知
-│       └── settings/       # 设置
-└── service/            # Go 后台服务（心跳、策略执行、数据采集）
-    ├── cmd/service/
-    ├── core/
-    ├── collectors/
-    └── enforcers/
+├── lib/                    # Flutter UI（手机 + PC 共享）
+│   ├── api/                # API 客户端
+│   ├── pages/              # 页面
+│   └── platform/           # 平台差异（API 路径、布局）
+├── android/ ios/           # 移动端工程
+├── windows/ macos/ linux/  # 桌面端工程
+└── service/                # PC 专用 Go 后台服务（心跳、策略、采集）
 ```
 
-| 组件 | 技术 | 说明 |
+| 平台 | UI | 后台服务 | API |
+|------|-----|----------|-----|
+| iOS / Android | Flutter | —（后期可扩展） | `/api/app/v1` |
+| Windows / macOS / Linux | Flutter | Go `service/` | `/api/client/v1` + `/api/client/v1/service` |
+
+## 页面（手机 + PC 共享）
+
+| 页面 | 路径 | 说明 |
 |------|------|------|
-| 桌面 UI | Electron + React + TypeScript + Ant Design | 用户可见页面 |
-| 后台服务 | Go 1.22+ | 无界面，负责心跳、策略、采集 |
-| UI API | `/api/client/v1` | 合规状态、通知、本机信息 |
-| 服务 API | `/api/client/v1/service` | 注册、心跳、资产/事件上报 |
+| 首页 | `/` | 安全状态概览 |
+| 合规 | `/compliance` | 合规检查项 |
+| 本机 | `/device` | 设备信息 |
+| 通知 | `/notifications` | 安全通知 |
+| 设置 | `/settings` | 服务器、自启动等 |
 
-## 页面功能
-
-| 页面 | 功能 |
-|------|------|
-| 首页 | 合规评分、待处理项、连接状态 |
-| 合规状态 | 基线检查项及通过/失败 |
-| 本机信息 | 主机名、OS、客户端版本 |
-| 安全通知 | DLP 告警、策略变更通知 |
-| 设置 | 服务器地址、自启动、后台运行 |
+- **手机**：底部 `NavigationBar`
+- **PC**：左侧 `NavigationRail`
 
 ## 开发
 
 ```bash
-# UI 开发
+# 安装 Flutter SDK 3.24+ 后：
 cd client
-npm install
-npm run dev
-
-# 后台服务
-cd client/service
-CLIENT_SERVER_URL=http://localhost:8080 go run ./cmd/service
+flutter pub get
+flutter run -d windows    # PC
+flutter run -d macos
+flutter run -d chrome     # Web 调试（可选）
+flutter run                 # 连接手机/模拟器
 ```
 
 ## 构建
 
 ```bash
-npm run build          # 构建 UI
-go build -o sentinel-service ./service/cmd/service   # 构建后台服务
-# 打包为 MSI/PKG/DEB 时由 Electron Builder 捆绑 UI + service
+flutter build apk          # Android
+flutter build ios          # iOS
+flutter build windows      # Windows
+flutter build macos        # macOS
+flutter build linux        # Linux
 ```
 
-## 支持平台
+## PC 后台服务（Go）
 
-| 平台 | 安装包 |
-|------|--------|
-| Windows 10/11 | `.msi` |
-| macOS 12+ | `.pkg` |
-| Linux | `.deb` / `.rpm` |
+桌面端另需常驻后台服务，与 Flutter UI 配合：
+
+```bash
+cd client/service
+CLIENT_SERVER_URL=http://localhost:8080 go run ./cmd/service
+```

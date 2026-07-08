@@ -1,47 +1,29 @@
 # SentinelHub 模块索引
 
-## 架构：单体 API + 业务模块分包
+## 客户端架构
 
-只有一个可执行服务 `sentinel-server`（:8080），内部按业务域分包。
+| 端 | 目录 | 技术 | API |
+|----|------|------|-----|
+| 管理控制台 | `console/` | React + Ant Design | `/api/admin/v1` |
+| **手机 + PC 客户端** | `client/` | **Flutter** | `/api/app/v1`（手机）/ `/api/client/v1`（PC） |
+| PC 后台服务 | `client/service/` | Go | `/api/client/v1/service` |
 
-### API 接入层
+> 手机与 PC **共用** `client/lib/` Flutter 代码，按平台自适应布局与 API。
 
-| 包路径 | 路径前缀 | 客户端 |
-|--------|----------|--------|
-| `api.admin` | `/api/admin/v1` | Web 管理控制台（PC） |
-| `api.app` | `/api/app/v1` | 手机管理 App |
-| `api.client` | `/api/client/v1` | PC 安全客户端 |
+## 业务模块（后端 `module.*`）
 
-### 业务模块层
-
-| 包路径 | 阶段 | 状态 | 能力 |
-|--------|------|------|------|
-| `module.identity` | P0 | 骨架 | 租户、用户、RBAC |
-| `module.device` | P0 | 骨架 | 设备注册、心跳 |
-| `module.asset` | P0 | 骨架 | 软硬件资产 |
-| `module.audit` | P0 | 骨架 | 审计日志 |
-| `module.policy` | P1 | 骨架 | 策略引擎 |
-| `module.software` | P1 | 骨架 | 软件管控 |
-| `module.compliance` | P1 | 骨架 | 合规检查 |
-| `module.dlp` | P2 | 骨架 | 数据防泄漏 |
-| `module.nac` | P2 | 骨架 | 终端准入 |
-| `module.zerotrust` | P3 | 骨架 | 零信任 |
-| `module.mdm` | P3 | 骨架 | MDM |
-| `module.remote` | P3 | 骨架 | 远程控制 |
-| `module.ai` | P4 | 预留 | AI 安全 |
-
-### 其他组件
-
-| 目录 | 技术 | 说明 |
-|------|------|------|
-| `console/` | React + Ant Design | PC 管理控制台 |
-| `mobile/` | React Native + Expo | 手机管理 App（规划） |
-| `client/` | Go | PC 安全客户端 |
+| 包路径 | 阶段 | 状态 |
+|--------|------|------|
+| `module.identity` | P0 | 骨架 |
+| `module.device` | P0 | 骨架 |
+| `module.asset` | P0 | 骨架 |
+| `module.audit` | P0 | 骨架 |
+| `module.policy` | P1 | 骨架 |
+| 其他模块 | P1~P4 | 骨架 |
 
 ## 下一步（P0）
 
-1. `module.identity` + `api.admin` 登录/RBAC
-2. `module.device` + `api.client` 注册/心跳
-3. `module.asset` 资产采集
-4. `module.audit` 审计管道
-5. `api.app` 移动端设备概览
+1. `module.identity` + 管理端登录
+2. `module.device` + PC Go 服务注册/心跳
+3. Flutter 对接 `/api/client/v1` 与 `/api/app/v1`
+4. 管理控制台设备列表
