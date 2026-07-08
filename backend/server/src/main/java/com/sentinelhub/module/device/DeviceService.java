@@ -3,6 +3,7 @@ package com.sentinelhub.module.device;
 import com.sentinelhub.module.audit.AuditService;
 import com.sentinelhub.module.device.domain.Device;
 import com.sentinelhub.module.policy.PolicyService;
+import com.sentinelhub.module.compliance.ComplianceService;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -20,12 +21,14 @@ public class DeviceService {
     private final DeviceRepository deviceRepository;
     private final AuditService auditService;
     private final PolicyService policyService;
+    private final ComplianceService complianceService;
 
     public DeviceService(DeviceRepository deviceRepository, AuditService auditService,
-                         PolicyService policyService) {
+                         PolicyService policyService, ComplianceService complianceService) {
         this.deviceRepository = deviceRepository;
         this.auditService = auditService;
         this.policyService = policyService;
+        this.complianceService = complianceService;
     }
 
     public Map<String, Object> register(String tenantId, String tenantToken, Map<String, Object> body) {
@@ -73,6 +76,10 @@ public class DeviceService {
         Map<String, Object> bundle = policyService.getBundleSummaryForClient(clientId);
         if (!bundle.isEmpty()) {
             response.put("policy_bundle", bundle);
+        }
+        Map<String, Object> complianceBaseline = complianceService.getBaselineSummaryForClient(clientId);
+        if (!complianceBaseline.isEmpty()) {
+            response.put("compliance_baseline", complianceBaseline);
         }
         return response;
     }

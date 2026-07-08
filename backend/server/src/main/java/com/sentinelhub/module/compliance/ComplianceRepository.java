@@ -19,25 +19,62 @@ public class ComplianceRepository {
         this.jdbc = jdbc;
     }
 
-    public String insertBaseline(String tenantId, String name, String framework, String rulesJson) {
+    public String insertBaseline(String tenantId, String name, String framework, String rulesJson, String contentHash) {
         String id = UUID.randomUUID().toString();
         jdbc.update(
-                "INSERT INTO compliance_baselines (id, tenant_id, name, framework, rules) VALUES (?,?,?,?,CAST(? AS JSON))",
-                id, tenantId, name, framework, rulesJson);
+                "INSERT INTO compliance_baselines (id, tenant_id, name, framework, is_active, rules, content_hash) "
+                        + "VALUES (?,?,?,?,1,CAST(? AS JSON),?)",
+                id, tenantId, name, framework, rulesJson, contentHash);
         return id;
     }
 
-    public Optional<String> findDefaultBaselineId(String tenantId) {
+    public Optional<String> findActiveBaselineId(String tenantId) {
         var ids = jdbc.query(
-                "SELECT id FROM compliance_baselines WHERE tenant_id = ? ORDER BY created_at ASC LIMIT 1",
+                "SELECT id FROM compliance_baselines WHERE tenant_id = ? AND is_active = 1 "
+                        + "ORDER BY created_at ASC LIMIT 1",
                 (rs, n) -> rs.getString("id"), tenantId);
         return ids.stream().findFirst();
+    }
+
+    public Optional<String> findDefaultBaselineId(String tenantId) {
+        return findActiveBaselineId(tenantId);
+    }
+
+    public Optional<Map<String, Object>> findActiveBaseline(String tenantId) {
+        var list = jdbc.queryForList(
+                "SELECT id, name, framework, CAST(rules AS CHAR) AS rules, content_hash, updated_at "
+                        + "FROM compliance_baselines WHERE tenant_id = ? AND is_active = 1 "
+                        + "ORDER BY created_at ASC LIMIT 1",
+                tenantId);
+        return list.stream().findFirst();
+    }
+
+    public Optional<Map<String, Object>> findById(String tenantId, String id) {
+        var list = jdbc.queryForList(
+                "SELECT id, name, framework, is_active, CAST(rules AS CHAR) AS rules, content_hash, "
+                        + "created_at, updated_at FROM compliance_baselines WHERE tenant_id = ? AND id = ?",
+                tenantId, id);
+        return list.stream().findFirst();
+    }
+
+    public List<Map<String, Object>> listByTenant(String tenantId) {
+        return jdbc.queryForList(
+                "SELECT id, name, framework, is_active, CAST(rules AS CHAR) AS rules, content_hash, "
+                        + "created_at, updated_at FROM compliance_baselines WHERE tenant_id = ? ORDER BY created_at ASC",
+                tenantId);
     }
 
     public boolean hasBaseline(String tenantId) {
         Integer c = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM compliance_baselines WHERE tenant_id = ?", Integer.class, tenantId);
         return c != null && c > 0;
+    }
+
+    public void updateBaseline(String tenantId, String id, String name, String rulesJson, String contentHash) {
+        jdbc.update(
+                "UPDATE compliance_baselines SET name = ?, rules = CAST(? AS JSON), content_hash = ?, "
+                        + "updated_at = CURRENT_TIMESTAMP(3) WHERE tenant_id = ? AND id = ?",
+                name, rulesJson, contentHash, tenantId, id);
     }
 
     public void insertResult(String tenantId, String deviceId, String baselineId, int score,
@@ -57,7 +94,7 @@ public class ComplianceRepository {
         return list.stream().findFirst();
     }
 
-    public List<Map<String, Object>> listByTenant(String tenantId, int limit, int offset) {
+    public List<Map<String, Object>> listResultsByTenant(String tenantId, int limit, int offset) {
         return jdbc.queryForList(
                 "SELECT r.id, r.score, r.passed, r.failed, r.scanned_at, d.hostname, d.agent_id, "
                         + "CAST(r.details AS CHAR) AS details "

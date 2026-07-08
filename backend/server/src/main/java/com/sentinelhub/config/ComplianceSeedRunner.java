@@ -33,6 +33,7 @@ public class ComplianceSeedRunner implements ApplicationRunner {
         }
         userRepository.findTenantIdBySlug(seedProperties.tenantSlug()).ifPresent(tenantId -> {
             complianceService.seedDefaultBaseline(tenantId);
+            complianceService.backfillBaselines(tenantId);
             log.info("Ensured default compliance baseline for tenant {}", seedProperties.tenantSlug());
         });
     }

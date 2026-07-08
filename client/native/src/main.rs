@@ -72,7 +72,8 @@ fn main() {
 
     if args.len() >= 3 && args[1] == "scan" && args[2] == "compliance" {
         let json_flag = args.iter().any(|a| a == "--json");
-        match scan::compliance::run() {
+        let rules_path = parse_flag_path(&args, "--rules-file");
+        match scan::compliance::run(rules_path.as_deref()) {
             Ok(result) => {
                 if json_flag {
                     println!("{}", serde_json::to_string(&result).unwrap_or_else(|_| "{}".into()));
@@ -89,7 +90,7 @@ fn main() {
     eprintln!("usage:");
     eprintln!("  sentinel-native collect --json");
     eprintln!("  sentinel-native enforce software --policy-file <path> --json");
-    eprintln!("  sentinel-native scan compliance --json");
+    eprintln!("  sentinel-native scan compliance [--rules-file <path>] --json");
     std::process::exit(2);
 }
 

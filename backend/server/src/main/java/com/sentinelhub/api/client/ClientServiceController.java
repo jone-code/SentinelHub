@@ -74,6 +74,14 @@ public class ClientServiceController {
         return ApiResponse.ok(policyService.getFullBundleForClient(clientId));
     }
 
+    @GetMapping("/compliance-baseline")
+    public ApiResponse<Map<String, Object>> complianceBaseline(@RequestParam("client_id") String clientId) {
+        if (clientId == null || clientId.isBlank()) {
+            throw new IllegalArgumentException("client_id required");
+        }
+        return ApiResponse.ok(complianceService.getBaselineForClient(clientId));
+    }
+
     @PostMapping("/report/assets")
     public ApiResponse<Map<String, String>> reportAssets(@RequestBody Map<String, Object> body) {
         String clientId = stringVal(body.get("client_id"));

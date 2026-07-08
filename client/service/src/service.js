@@ -3,6 +3,7 @@ import { resolveNativeBin } from './native-bridge.js';
 import { LocalServer } from './local-server.js';
 import { loadClientState, saveClientState } from './state.js';
 import { loadPolicyState, syncPolicy } from './policy.js';
+import { loadBaselineState, syncBaseline } from './compliance-baseline.js';
 import { enforceSoftware, violationsToEvents } from './enforcers/software.js';
 import { scanCompliance } from './collectors/compliance.js';
 
@@ -36,6 +37,8 @@ export class ClientService {
     this.assets = null;
     /** @type {object | null} */
     this.policy = null;
+    /** @type {object | null} */
+    this.complianceBaseline = null;
     /** @type {Set<string>} */
     this.reportedViolations = new Set();
   }
@@ -61,6 +64,10 @@ export class ClientService {
       policy: {
         version: this.policy?.version ?? null,
         hash: this.policy?.hash ?? null,
+      },
+      compliance_baseline: {
+        id: this.complianceBaseline?.id ?? null,
+        hash: this.complianceBaseline?.hash ?? null,
       },
       started_at: this.state.startedAt,
     };
@@ -92,6 +99,7 @@ export class ClientService {
     await this.localServer.start();
 
     this.policy = await loadPolicyState();
+    this.complianceBaseline = await loadBaselineState();
 
     const saved = await loadClientState();
     if (saved.client_id) {
@@ -195,6 +203,11 @@ export class ClientService {
       if (bundleSummary && this.state.clientId) {
         this.policy = await syncPolicy(this.config, this.state.clientId, bundleSummary);
       }
+      const baselineSummary = body?.data?.compliance_baseline;
+      if (baselineSummary && this.state.clientId) {
+        this.complianceBaseline = await syncBaseline(this.config, this.state.clientId, baselineSummary);
+        await this.runComplianceScan();
+      }
       await this.runEnforcement();
       console.log('[sentinel-service] heartbeat ok', body?.data?.server_time ?? res.status);
     } catch (err) {
@@ -223,7 +236,7 @@ export class ClientService {
   async runComplianceScan() {
     if (!this.state.clientId) return;
     try {
-      const report = await scanCompliance(this.nativeBin);
+      const report = await scanCompliance(this.nativeBin, this.complianceBaseline);
       console.log(`[sentinel-service] compliance scan score=${report.score} passed=${report.passed} failed=${report.failed}`);
       await this.reportCompliance(report);
     } catch (err) {
