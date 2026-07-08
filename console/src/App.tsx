@@ -6,6 +6,7 @@ import Audit from './pages/audit';
 import Login from './pages/login';
 import Policies from './pages/policies';
 import Events from './pages/events';
+import Compliance from './pages/compliance';
 import { getToken, clearToken } from './api/client';
 
 const { Header, Sider, Content } = Layout;
@@ -58,6 +59,7 @@ function AppLayout() {
             <Route path="/devices" element={<Devices />} />
             <Route path="/policies" element={<Policies />} />
             <Route path="/events" element={<Events />} />
+            <Route path="/compliance" element={<Compliance />} />
             <Route path="/audit" element={<Audit />} />
             <Route path="*" element={<Placeholder title="模块开发中" />} />
           </Routes>

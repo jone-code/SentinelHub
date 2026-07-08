@@ -113,10 +113,11 @@ public class DeviceService {
         return deviceRepository.findByAgentIdAny(clientId)
                 .map(d -> {
                     Map<String, Object> m = new HashMap<>();
-                    m.put("compliance_score", d.complianceScore() != null ? d.complianceScore() : 0);
+                    int score = d.complianceScore() != null ? d.complianceScore() : 0;
+                    m.put("compliance_score", score);
                     m.put("trust_score", 0);
                     m.put("service_running", resolveDisplayStatus(d).equals("online"));
-                    m.put("pending_items", 0);
+                    m.put("pending_items", score < 100 ? 1 : 0);
                     m.put("unread_notifications", 0);
                     m.put("client_id", d.agentId());
                     m.put("hostname", d.hostname());
@@ -133,17 +134,8 @@ public class DeviceService {
     }
 
     public Map<String, Object> getCompliance(String clientId) {
-        return deviceRepository.findByAgentIdAny(clientId)
-                .map(d -> Map.<String, Object>of(
-                        "score", d.complianceScore() != null ? d.complianceScore() : 0,
-                        "items", List.of(
-                                Map.of("name", "操作系统补丁", "status", "pending"),
-                                Map.of("name", "杀毒软件", "status", "pending"),
-                                Map.of("name", "防火墙", "status", "pending"),
-                                Map.of("name", "磁盘加密", "status", "pending")
-                        )
-                ))
-                .orElse(Map.of("score", 0, "items", List.of()));
+        // deprecated — use ComplianceService via ClientUiController
+        return Map.of("score", 0, "items", List.of());
     }
 
     public Map<String, Object> getDeviceForAdmin(String tenantId, String deviceId) {

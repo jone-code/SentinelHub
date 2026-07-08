@@ -6,6 +6,7 @@ import com.sentinelhub.module.device.DeviceService;
 import com.sentinelhub.module.identity.IdentityService;
 import com.sentinelhub.module.policy.PolicyService;
 import com.sentinelhub.module.software.SoftwareService;
+import com.sentinelhub.module.compliance.ComplianceService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,15 +26,17 @@ public class ClientServiceController {
     private final AssetService assetService;
     private final PolicyService policyService;
     private final SoftwareService softwareService;
+    private final ComplianceService complianceService;
 
     public ClientServiceController(IdentityService identityService, DeviceService deviceService,
                                    AssetService assetService, PolicyService policyService,
-                                   SoftwareService softwareService) {
+                                   SoftwareService softwareService, ComplianceService complianceService) {
         this.identityService = identityService;
         this.deviceService = deviceService;
         this.assetService = assetService;
         this.policyService = policyService;
         this.softwareService = softwareService;
+        this.complianceService = complianceService;
     }
 
     @GetMapping("/info")
@@ -85,6 +88,23 @@ public class ClientServiceController {
                 .orElseThrow(() -> new IllegalArgumentException("device not registered"));
         assetService.ingestReport(device.tenantId(), device.deviceId(), assets);
         return ApiResponse.ok(Map.of("status", "accepted"));
+    }
+
+    @PostMapping("/report/compliance")
+    public ApiResponse<Map<String, Object>> reportCompliance(@RequestBody Map<String, Object> body) {
+        String clientId = stringVal(body.get("client_id"));
+        if (clientId == null || clientId.isBlank()) {
+            throw new IllegalArgumentException("client_id required");
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> report = body.get("report") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m : body;
+
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        Map<String, Object> result = complianceService.ingestScan(
+                device.tenantId(), device.deviceId(), clientId, report);
+        return ApiResponse.ok(result);
     }
 
     @PostMapping("/report/events")

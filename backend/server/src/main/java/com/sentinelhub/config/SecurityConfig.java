@@ -32,6 +32,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/client/v1/service/register", "/api/client/v1/service/heartbeat",
                                 "/api/client/v1/service/info", "/api/client/v1/service/report/assets",
                                 "/api/client/v1/service/report/events",
+                                "/api/client/v1/service/report/compliance",
                                 "/api/client/v1/service/policy-bundle").permitAll()
                         .requestMatchers("/api/client/v1/info", "/api/client/v1/status").permitAll()
                         .requestMatchers("/api/admin/v1/**").authenticated()

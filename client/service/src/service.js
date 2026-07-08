@@ -4,6 +4,7 @@ import { LocalServer } from './local-server.js';
 import { loadClientState, saveClientState } from './state.js';
 import { loadPolicyState, syncPolicy } from './policy.js';
 import { enforceSoftware, violationsToEvents } from './enforcers/software.js';
+import { scanCompliance } from './collectors/compliance.js';
 
 /**
  * PC client background service — orchestration layer.
@@ -16,6 +17,7 @@ export class ClientService {
     this.heartbeatTimer = null;
     this.assetTimer = null;
     this.enforceTimer = null;
+    this.complianceTimer = null;
     this.running = false;
     /** @type {LocalServer | null} */
     this.localServer = null;
@@ -109,10 +111,12 @@ export class ClientService {
 
     await this.heartbeat();
     await this.runEnforcement();
+    await this.runComplianceScan();
 
     this.heartbeatTimer = setInterval(() => this.heartbeat(), this.config.heartbeatIntervalMs);
     this.assetTimer = setInterval(() => this.collectAndReportAssets(), this.config.assetCollectIntervalMs);
     this.enforceTimer = setInterval(() => this.runEnforcement(), this.config.enforceIntervalMs);
+    this.complianceTimer = setInterval(() => this.runComplianceScan(), this.config.complianceIntervalMs);
   }
 
   async stop() {
@@ -128,6 +132,10 @@ export class ClientService {
     if (this.enforceTimer) {
       clearInterval(this.enforceTimer);
       this.enforceTimer = null;
+    }
+    if (this.complianceTimer) {
+      clearInterval(this.complianceTimer);
+      this.complianceTimer = null;
     }
     if (this.localServer) {
       await this.localServer.stop();
@@ -209,6 +217,36 @@ export class ClientService {
       }
     } catch (err) {
       console.error('[sentinel-service] asset collect failed:', err.message);
+    }
+  }
+
+  async runComplianceScan() {
+    if (!this.state.clientId) return;
+    try {
+      const report = await scanCompliance(this.nativeBin);
+      console.log(`[sentinel-service] compliance scan score=${report.score} passed=${report.passed} failed=${report.failed}`);
+      await this.reportCompliance(report);
+    } catch (err) {
+      console.error('[sentinel-service] compliance scan failed:', err.message);
+    }
+  }
+
+  async reportCompliance(report) {
+    const url = `${this.config.serverUrl}/api/client/v1/service/report/compliance`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: this.state.clientId,
+          report,
+        }),
+      });
+      if (!res.ok) {
+        console.warn('[sentinel-service] compliance report status', res.status);
+      }
+    } catch (err) {
+      console.error('[sentinel-service] compliance report failed:', err.message);
     }
   }
 

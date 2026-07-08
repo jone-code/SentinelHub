@@ -95,6 +95,18 @@ public class DeviceRepository {
                 hostname, osType, osVersion, tenantId, agentId);
     }
 
+    public void updateComplianceScore(String tenantId, String deviceId, int score) {
+        jdbc.update(
+                "UPDATE devices SET compliance_score = ?, updated_at = CURRENT_TIMESTAMP(3) WHERE tenant_id = ? AND id = ?",
+                score, tenantId, deviceId);
+    }
+
+    public void updateComplianceScoreByAgentId(String tenantId, String agentId, int score) {
+        jdbc.update(
+                "UPDATE devices SET compliance_score = ?, updated_at = CURRENT_TIMESTAMP(3) WHERE tenant_id = ? AND agent_id = ?",
+                score, tenantId, agentId);
+    }
+
     private static Instant toInstant(Timestamp ts) {
         return ts != null ? ts.toInstant() : null;
     }

@@ -24,7 +24,7 @@ Node auto-detects `../../native/target/release/sentinel-native`, or set `SENTINE
 
 ```bash
 sentinel-native collect --json
-sentinel-native enforce software --policy-file /path/to/policy.json --json
+sentinel-native scan compliance --json
 ```
 
 ## Roadmap
@@ -33,4 +33,5 @@ sentinel-native enforce software --policy-file /path/to/policy.json --json
 |-------|----------|
 | P0 | `collect` — hardware snapshot |
 | P1 | `enforce software` — blacklist process detection |
+| P1 | `scan compliance` — security baseline checks |
 | P2 | DLP / NAC via driver communication |

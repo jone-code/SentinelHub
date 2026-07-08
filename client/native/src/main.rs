@@ -4,6 +4,7 @@
 //!   sentinel-native enforce software --policy-file <path> --json
 
 mod enforce;
+mod scan;
 
 use serde::Serialize;
 use std::env;
@@ -69,9 +70,26 @@ fn main() {
         return;
     }
 
+    if args.len() >= 3 && args[1] == "scan" && args[2] == "compliance" {
+        let json_flag = args.iter().any(|a| a == "--json");
+        match scan::compliance::run() {
+            Ok(result) => {
+                if json_flag {
+                    println!("{}", serde_json::to_string(&result).unwrap_or_else(|_| "{}".into()));
+                }
+            }
+            Err(err) => {
+                eprintln!("{err}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
     eprintln!("usage:");
     eprintln!("  sentinel-native collect --json");
     eprintln!("  sentinel-native enforce software --policy-file <path> --json");
+    eprintln!("  sentinel-native scan compliance --json");
     std::process::exit(2);
 }
 

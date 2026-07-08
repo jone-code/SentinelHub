@@ -1,6 +1,7 @@
 package com.sentinelhub.api.client;
 
 import com.sentinelhub.common.dto.ApiResponse;
+import com.sentinelhub.module.compliance.ComplianceService;
 import com.sentinelhub.module.device.DeviceService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -9,17 +10,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/**
- * PC client UI API — for desktop application pages.
- */
 @RestController
 @RequestMapping("/api/client/v1")
 public class ClientUiController {
 
     private final DeviceService deviceService;
+    private final ComplianceService complianceService;
 
-    public ClientUiController(DeviceService deviceService) {
+    public ClientUiController(DeviceService deviceService, ComplianceService complianceService) {
         this.deviceService = deviceService;
+        this.complianceService = complianceService;
     }
 
     @GetMapping("/info")
@@ -52,6 +52,6 @@ public class ClientUiController {
         if (clientId == null || clientId.isBlank()) {
             return ApiResponse.ok(Map.of("score", 0, "items", java.util.List.of()));
         }
-        return ApiResponse.ok(deviceService.getCompliance(clientId));
+        return ApiResponse.ok(complianceService.getComplianceForClient(clientId));
     }
 }

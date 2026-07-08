@@ -2,6 +2,7 @@ package com.sentinelhub.api.admin;
 
 import com.sentinelhub.common.dto.ApiResponse;
 import com.sentinelhub.common.tenant.TenantContext;
+import com.sentinelhub.module.compliance.ComplianceService;
 import com.sentinelhub.module.device.DeviceService;
 import com.sentinelhub.module.software.SoftwareService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,10 +17,13 @@ public class AdminDashboardController {
 
     private final DeviceService deviceService;
     private final SoftwareService softwareService;
+    private final ComplianceService complianceService;
 
-    public AdminDashboardController(DeviceService deviceService, SoftwareService softwareService) {
+    public AdminDashboardController(DeviceService deviceService, SoftwareService softwareService,
+                                    ComplianceService complianceService) {
         this.deviceService = deviceService;
         this.softwareService = softwareService;
+        this.complianceService = complianceService;
     }
 
     @GetMapping("/summary")
@@ -29,11 +33,12 @@ public class AdminDashboardController {
             throw new IllegalArgumentException("unauthorized");
         }
         Map<String, Object> base = deviceService.dashboardSummary(ctx.tenantId());
+        Map<String, Object> compliance = complianceService.overviewForAdmin(ctx.tenantId());
         return ApiResponse.ok(Map.of(
                 "device_total", base.get("device_total"),
                 "device_online", base.get("device_online"),
                 "alert_open", softwareService.countRecentAlerts(ctx.tenantId()),
-                "compliance_avg", base.get("compliance_avg")
+                "compliance_avg", compliance.get("average_score")
         ));
     }
 }
