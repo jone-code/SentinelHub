@@ -19,10 +19,11 @@
 | `module.asset` | P0 | **资产上报/入库** |
 | `module.audit` | P0 | **审计写入/查询** |
 | `module.policy` | P1 | **CRUD/发布/策略包下发** |
+| `module.software` | P1 | **黑名单检测/事件上报** |
 | 其他模块 | P1~P4 | 骨架 |
 
 ## 下一步（P1 继续）
 
-1. Rust enforcer — 软件黑名单进程检测
-2. `module.compliance` 合规扫描与真实评分
+1. `module.compliance` 合规扫描与真实评分
+2. 进程 `block` 动作（终止违规进程）
 3. 策略作用域（按设备组/组织）

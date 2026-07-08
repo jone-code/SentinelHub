@@ -14,5 +14,6 @@ export function loadConfig() {
     localPort,
     nativeBin: process.env.SENTINEL_NATIVE_BIN || '',
     assetCollectIntervalMs: parseInt(process.env.CLIENT_ASSET_INTERVAL_SEC || '300', 10) * 1000,
+    enforceIntervalMs: parseInt(process.env.CLIENT_ENFORCE_INTERVAL_SEC || '60', 10) * 1000,
   };
 }

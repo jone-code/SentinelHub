@@ -5,6 +5,7 @@ import Devices from './pages/devices';
 import Audit from './pages/audit';
 import Login from './pages/login';
 import Policies from './pages/policies';
+import Events from './pages/events';
 import { getToken, clearToken } from './api/client';
 
 const { Header, Sider, Content } = Layout;
@@ -14,6 +15,7 @@ const menuItems = [
   { key: '/devices', label: <Link to="/devices">设备管控</Link> },
   { key: '/assets', label: <Link to="/assets">资产管理</Link> },
   { key: '/policies', label: <Link to="/policies">策略管理</Link> },
+  { key: '/events', label: <Link to="/events">安全事件</Link> },
   { key: '/compliance', label: <Link to="/compliance">合规检查</Link> },
   { key: '/dlp', label: <Link to="/dlp">DLP</Link> },
   { key: '/audit', label: <Link to="/audit">审计日志</Link> },
@@ -55,6 +57,7 @@ function AppLayout() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/devices" element={<Devices />} />
             <Route path="/policies" element={<Policies />} />
+            <Route path="/events" element={<Events />} />
             <Route path="/audit" element={<Audit />} />
             <Route path="*" element={<Placeholder title="模块开发中" />} />
           </Routes>

@@ -1,7 +1,13 @@
-//! SentinelHub native sidecar — invoked by Node: `sentinel-native collect --json`
+//! SentinelHub native sidecar
+//!
+//!   sentinel-native collect --json
+//!   sentinel-native enforce software --policy-file <path> --json
+
+mod enforce;
 
 use serde::Serialize;
 use std::env;
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize)]
@@ -30,6 +36,7 @@ struct SoftwareItem {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
     if args.len() >= 3 && args[1] == "collect" && args[2] == "--json" {
         match collect_assets() {
             Ok(json) => println!("{json}"),
@@ -40,8 +47,39 @@ fn main() {
         }
         return;
     }
-    eprintln!("usage: sentinel-native collect --json");
+
+    if args.len() >= 4 && args[1] == "enforce" && args[2] == "software" {
+        let policy_path = parse_flag_path(&args, "--policy-file")
+            .unwrap_or_else(|| {
+                eprintln!("--policy-file required");
+                std::process::exit(2);
+            });
+        let json_flag = args.iter().any(|a| a == "--json");
+        match enforce::software::run(&policy_path) {
+            Ok(result) => {
+                if json_flag {
+                    println!("{}", serde_json::to_string(&result).unwrap_or_else(|_| "{}".into()));
+                }
+            }
+            Err(err) => {
+                eprintln!("{err}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    eprintln!("usage:");
+    eprintln!("  sentinel-native collect --json");
+    eprintln!("  sentinel-native enforce software --policy-file <path> --json");
     std::process::exit(2);
+}
+
+fn parse_flag_path(args: &[String], flag: &str) -> Option<PathBuf> {
+    args.iter()
+        .position(|a| a == flag)
+        .and_then(|i| args.get(i + 1))
+        .map(PathBuf::from)
 }
 
 fn collect_assets() -> Result<String, String> {

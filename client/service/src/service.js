@@ -3,6 +3,7 @@ import { resolveNativeBin } from './native-bridge.js';
 import { LocalServer } from './local-server.js';
 import { loadClientState, saveClientState } from './state.js';
 import { loadPolicyState, syncPolicy } from './policy.js';
+import { enforceSoftware, violationsToEvents } from './enforcers/software.js';
 
 /**
  * PC client background service — orchestration layer.
@@ -14,6 +15,7 @@ export class ClientService {
     this.config = config;
     this.heartbeatTimer = null;
     this.assetTimer = null;
+    this.enforceTimer = null;
     this.running = false;
     /** @type {LocalServer | null} */
     this.localServer = null;
@@ -32,6 +34,8 @@ export class ClientService {
     this.assets = null;
     /** @type {object | null} */
     this.policy = null;
+    /** @type {Set<string>} */
+    this.reportedViolations = new Set();
   }
 
   getLocalStatus() {
@@ -104,9 +108,11 @@ export class ClientService {
     }
 
     await this.heartbeat();
+    await this.runEnforcement();
 
     this.heartbeatTimer = setInterval(() => this.heartbeat(), this.config.heartbeatIntervalMs);
     this.assetTimer = setInterval(() => this.collectAndReportAssets(), this.config.assetCollectIntervalMs);
+    this.enforceTimer = setInterval(() => this.runEnforcement(), this.config.enforceIntervalMs);
   }
 
   async stop() {
@@ -118,6 +124,10 @@ export class ClientService {
     if (this.assetTimer) {
       clearInterval(this.assetTimer);
       this.assetTimer = null;
+    }
+    if (this.enforceTimer) {
+      clearInterval(this.enforceTimer);
+      this.enforceTimer = null;
     }
     if (this.localServer) {
       await this.localServer.stop();
@@ -177,6 +187,7 @@ export class ClientService {
       if (bundleSummary && this.state.clientId) {
         this.policy = await syncPolicy(this.config, this.state.clientId, bundleSummary);
       }
+      await this.runEnforcement();
       console.log('[sentinel-service] heartbeat ok', body?.data?.server_time ?? res.status);
     } catch (err) {
       this.state.lastHeartbeatAt = new Date().toISOString();
@@ -198,6 +209,48 @@ export class ClientService {
       }
     } catch (err) {
       console.error('[sentinel-service] asset collect failed:', err.message);
+    }
+  }
+
+  async reportEvents(events) {
+    if (!events.length || !this.state.clientId) return;
+    const url = `${this.config.serverUrl}/api/client/v1/service/report/events`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: this.state.clientId,
+          events,
+        }),
+      });
+      if (!res.ok) {
+        console.warn('[sentinel-service] event report status', res.status);
+      } else {
+        console.log(`[sentinel-service] reported ${events.length} event(s)`);
+      }
+    } catch (err) {
+      console.error('[sentinel-service] event report failed:', err.message);
+    }
+  }
+
+  async runEnforcement() {
+    if (!this.policy || !this.state.clientId) return;
+    try {
+      const result = await enforceSoftware(this.nativeBin, this.policy);
+      const newEvents = [];
+      for (const v of result.violations ?? []) {
+        const key = `${v.process}:${v.matched_rule}`;
+        if (this.reportedViolations.has(key)) continue;
+        this.reportedViolations.add(key);
+        newEvents.push(...violationsToEvents([v]));
+        console.warn(`[sentinel-service] software violation: ${v.process} (rule: ${v.matched_rule})`);
+      }
+      if (newEvents.length > 0) {
+        await this.reportEvents(newEvents);
+      }
+    } catch (err) {
+      console.error('[sentinel-service] enforcement failed:', err.message);
     }
   }
 

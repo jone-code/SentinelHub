@@ -5,6 +5,7 @@ import com.sentinelhub.module.asset.AssetService;
 import com.sentinelhub.module.device.DeviceService;
 import com.sentinelhub.module.identity.IdentityService;
 import com.sentinelhub.module.policy.PolicyService;
+import com.sentinelhub.module.software.SoftwareService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -22,13 +24,16 @@ public class ClientServiceController {
     private final DeviceService deviceService;
     private final AssetService assetService;
     private final PolicyService policyService;
+    private final SoftwareService softwareService;
 
     public ClientServiceController(IdentityService identityService, DeviceService deviceService,
-                                   AssetService assetService, PolicyService policyService) {
+                                   AssetService assetService, PolicyService policyService,
+                                   SoftwareService softwareService) {
         this.identityService = identityService;
         this.deviceService = deviceService;
         this.assetService = assetService;
         this.policyService = policyService;
+        this.softwareService = softwareService;
     }
 
     @GetMapping("/info")
@@ -84,7 +89,20 @@ public class ClientServiceController {
 
     @PostMapping("/report/events")
     public ApiResponse<Map<String, String>> reportEvents(@RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(Map.of("status", "accepted"));
+        String clientId = stringVal(body.get("client_id"));
+        if (clientId == null || clientId.isBlank()) {
+            throw new IllegalArgumentException("client_id required");
+        }
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> events = body.get("events") instanceof List<?> list
+                ? (List<Map<String, Object>>) list : List.of();
+
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        if (!events.isEmpty()) {
+            softwareService.ingestEvents(device.tenantId(), device.deviceId(), clientId, events);
+        }
+        return ApiResponse.ok(Map.of("status", "accepted", "count", String.valueOf(events.size())));
     }
 
     private static String stringVal(Object o) {
