@@ -62,6 +62,37 @@ public class AssetRepository {
                 deviceId);
     }
 
+    public List<Map<String, Object>> listSoftwareInventory(String tenantId, int limit, int offset) {
+        return jdbc.queryForList(
+                "SELECT s.name, s.version, COUNT(DISTINCT s.device_id) AS device_count, "
+                        + "MAX(s.collected_at) AS last_collected_at "
+                        + "FROM asset_software s WHERE s.tenant_id = ? "
+                        + "GROUP BY s.name, s.version ORDER BY device_count DESC, s.name LIMIT ? OFFSET ?",
+                tenantId, limit, offset);
+    }
+
+    public int countSoftwareInventory(String tenantId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM (SELECT 1 FROM asset_software WHERE tenant_id = ? GROUP BY name, version) t",
+                Integer.class, tenantId);
+        return count != null ? count : 0;
+    }
+
+    public List<Map<String, Object>> listHardwareInventory(String tenantId, int limit, int offset) {
+        return jdbc.queryForList(
+                "SELECT h.device_id, h.hostname, h.os_type, h.os_version, h.arch, h.cpu_model, h.cpu_cores, "
+                        + "h.memory_mb, h.collected_at, d.agent_id "
+                        + "FROM asset_hardware h JOIN devices d ON d.id = h.device_id "
+                        + "WHERE h.tenant_id = ? ORDER BY h.updated_at DESC LIMIT ? OFFSET ?",
+                tenantId, limit, offset);
+    }
+
+    public int countHardwareInventory(String tenantId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM asset_hardware WHERE tenant_id = ?", Integer.class, tenantId);
+        return count != null ? count : 0;
+    }
+
     private static String str(Object o) {
         return o != null ? o.toString() : null;
     }

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentinelhub.module.audit.AuditService;
 import com.sentinelhub.module.device.DeviceRepository;
 import com.sentinelhub.module.device.domain.Device;
+import com.sentinelhub.module.zerotrust.ZerotrustService;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -23,13 +24,16 @@ public class NacService {
     private final DeviceRepository deviceRepository;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
+    private final ZerotrustService zerotrustService;
 
     public NacService(NacRepository nacRepository, DeviceRepository deviceRepository,
-                      AuditService auditService, ObjectMapper objectMapper) {
+                      AuditService auditService, ObjectMapper objectMapper,
+                      ZerotrustService zerotrustService) {
         this.nacRepository = nacRepository;
         this.deviceRepository = deviceRepository;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
+        this.zerotrustService = zerotrustService;
     }
 
     public void seedDemoPolicy(String tenantId) {
@@ -132,6 +136,7 @@ public class NacService {
         Integer score = status.get("compliance_score") instanceof Number n ? n.intValue() : device.complianceScore();
         String detailJson = toJson(status);
         nacRepository.upsertDeviceStatus(tenantId, deviceId, policyId, accessState, score, detailJson, Instant.now());
+        zerotrustService.recomputeForDevice(tenantId, deviceId);
         if ("denied".equals(accessState) || "restricted".equals(accessState)) {
             auditService.log(tenantId, "agent", clientId, "nac." + accessState, "device", deviceId, status, null);
         }

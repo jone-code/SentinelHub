@@ -10,6 +10,9 @@ import Events from './pages/events';
 import Compliance from './pages/compliance';
 import Dlp from './pages/dlp';
 import Nac from './pages/nac';
+import Assets from './pages/assets';
+import Zerotrust from './pages/zerotrust';
+import Mdm from './pages/mdm';
 import { getToken, clearToken } from './api/client';
 
 const { Header, Sider, Content } = Layout;
@@ -24,6 +27,8 @@ const menuItems = [
   { key: '/compliance', label: <Link to="/compliance">合规检查</Link> },
   { key: '/dlp', label: <Link to="/dlp">DLP</Link> },
   { key: '/nac', label: <Link to="/nac">网络准入</Link> },
+  { key: '/zerotrust', label: <Link to="/zerotrust">零信任</Link> },
+  { key: '/mdm', label: <Link to="/mdm">移动纳管</Link> },
   { key: '/audit', label: <Link to="/audit">审计日志</Link> },
 ];
 
@@ -68,6 +73,9 @@ function AppLayout() {
             <Route path="/compliance" element={<Compliance />} />
             <Route path="/dlp" element={<Dlp />} />
             <Route path="/nac" element={<Nac />} />
+            <Route path="/assets" element={<Assets />} />
+            <Route path="/zerotrust" element={<Zerotrust />} />
+            <Route path="/mdm" element={<Mdm />} />
             <Route path="/audit" element={<Audit />} />
             <Route path="*" element={<Placeholder title="模块开发中" />} />
           </Routes>

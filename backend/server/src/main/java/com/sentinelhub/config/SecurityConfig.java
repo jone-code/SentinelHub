@@ -39,8 +39,11 @@ public class SecurityConfig {
                                 "/api/client/v1/service/compliance-baseline",
                                 "/api/client/v1/service/dlp-rules",
                                 "/api/client/v1/service/nac-policy",
-                                "/api/client/v1/service/nac-radius").permitAll()
-                        .requestMatchers("/api/client/v1/info", "/api/client/v1/status").permitAll()
+                                "/api/client/v1/service/nac-radius",
+                                "/api/client/v1/service/zt-policy",
+                                "/api/client/v1/service/mdm-profiles",
+                                "/api/client/v1/service/report/mdm-applied").permitAll()
+                        .requestMatchers("/api/client/v1/info", "/api/client/v1/status", "/api/client/v1/trust").permitAll()
                         .requestMatchers("/api/admin/v1/**").authenticated()
                         .requestMatchers("/api/app/v1/**").authenticated()
                         .anyRequest().permitAll()

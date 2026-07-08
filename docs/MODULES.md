@@ -23,12 +23,13 @@
 | `module.compliance` | P1 | **基线扫描/评分/可配置基线** |
 | `module.dlp` | P2 | **规则/USB 管控/MinIO 取证** |
 | `module.nac` | P2 | **准入策略/合规联动/RADIUS 模板** |
-| 其他模块 | P3~P4 | 骨架 |
+| `module.zerotrust` | P3 | **信任分/受保护应用/历史记录** |
+| `module.mdm` | P3 | **配置描述文件/设备分配** |
+| `module.asset` | P3 | **租户级资产清单页** |
+| 其他模块 | P4 | 骨架 |
 
-## 下一步（P3）
+## 下一步（P4）
 
-1. `module.zerotrust` — 信任分与动态策略
-2. `module.mdm` — 移动端基础纳管
-3. `module.remote` — 远程协助
-4. Rust 驱动实装（`native/driver/`）
-5. 控制台资产管理页
+1. `module.remote` — 远程协助
+2. Rust 驱动实装（`native/driver/`）
+3. AI 辅助分析

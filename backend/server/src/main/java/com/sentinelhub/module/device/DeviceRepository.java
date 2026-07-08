@@ -26,6 +26,7 @@ public class DeviceRepository {
             rs.getString("status"),
             toInstant(rs.getTimestamp("last_seen_at")),
             rs.getObject("compliance_score") != null ? rs.getInt("compliance_score") : null,
+            rs.getObject("trust_score") != null ? rs.getInt("trust_score") : null,
             rs.getTimestamp("created_at").toInstant()
     );
 
@@ -105,6 +106,19 @@ public class DeviceRepository {
         jdbc.update(
                 "UPDATE devices SET compliance_score = ?, updated_at = CURRENT_TIMESTAMP(3) WHERE tenant_id = ? AND agent_id = ?",
                 score, tenantId, agentId);
+    }
+
+    public void updateTrustScore(String tenantId, String deviceId, int score) {
+        jdbc.update(
+                "UPDATE devices SET trust_score = ?, updated_at = CURRENT_TIMESTAMP(3) WHERE tenant_id = ? AND id = ?",
+                score, tenantId, deviceId);
+    }
+
+    public Double averageTrustScore(String tenantId) {
+        Double avg = jdbc.queryForObject(
+                "SELECT AVG(trust_score) FROM devices WHERE tenant_id = ? AND trust_score IS NOT NULL",
+                Double.class, tenantId);
+        return avg != null ? avg : 0.0;
     }
 
     private static Instant toInstant(Timestamp ts) {

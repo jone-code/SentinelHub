@@ -6,6 +6,8 @@ import com.sentinelhub.module.policy.PolicyService;
 import com.sentinelhub.module.compliance.ComplianceService;
 import com.sentinelhub.module.dlp.DlpService;
 import com.sentinelhub.module.nac.NacService;
+import com.sentinelhub.module.zerotrust.ZerotrustService;
+import com.sentinelhub.module.mdm.MdmService;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -26,16 +28,21 @@ public class DeviceService {
     private final ComplianceService complianceService;
     private final DlpService dlpService;
     private final NacService nacService;
+    private final ZerotrustService zerotrustService;
+    private final MdmService mdmService;
 
     public DeviceService(DeviceRepository deviceRepository, AuditService auditService,
                          PolicyService policyService, ComplianceService complianceService,
-                         DlpService dlpService, NacService nacService) {
+                         DlpService dlpService, NacService nacService,
+                         ZerotrustService zerotrustService, MdmService mdmService) {
         this.deviceRepository = deviceRepository;
         this.auditService = auditService;
         this.policyService = policyService;
         this.complianceService = complianceService;
         this.dlpService = dlpService;
         this.nacService = nacService;
+        this.zerotrustService = zerotrustService;
+        this.mdmService = mdmService;
     }
 
     public Map<String, Object> register(String tenantId, String tenantToken, Map<String, Object> body) {
@@ -97,6 +104,14 @@ public class DeviceService {
             if (!nacPolicy.isEmpty()) {
                 response.put("nac_policy", nacPolicy);
             }
+            Map<String, Object> ztPolicy = zerotrustService.getPolicySummaryForClient(device.tenantId());
+            if (!ztPolicy.isEmpty()) {
+                response.put("zt_policy", ztPolicy);
+            }
+            Map<String, Object> mdmProfiles = mdmService.getProfilesSummaryForClient(device.tenantId());
+            if (!mdmProfiles.isEmpty()) {
+                response.put("mdm_profiles", mdmProfiles);
+            }
         });
         return response;
     }
@@ -138,8 +153,9 @@ public class DeviceService {
                 .map(d -> {
                     Map<String, Object> m = new HashMap<>();
                     int score = d.complianceScore() != null ? d.complianceScore() : 0;
+                    int trust = d.trustScore() != null ? d.trustScore() : 0;
                     m.put("compliance_score", score);
-                    m.put("trust_score", 0);
+                    m.put("trust_score", trust);
                     m.put("service_running", resolveDisplayStatus(d).equals("online"));
                     m.put("pending_items", score < 100 ? 1 : 0);
                     m.put("unread_notifications", 0);
@@ -186,6 +202,7 @@ public class DeviceService {
         m.put("status", resolveDisplayStatus(d));
         m.put("last_seen_at", d.lastSeenAt() != null ? d.lastSeenAt().toString() : null);
         m.put("compliance_score", d.complianceScore());
+        m.put("trust_score", d.trustScore());
         return m;
     }
 

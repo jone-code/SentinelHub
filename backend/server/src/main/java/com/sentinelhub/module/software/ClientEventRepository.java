@@ -42,4 +42,20 @@ public class ClientEventRepository {
                 Integer.class, tenantId);
         return c != null ? c : 0;
     }
+
+    public int countRecentHighSeverity(String deviceId, int hours) {
+        Integer c = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM client_events WHERE device_id = ? AND created_at >= NOW() - INTERVAL ? HOUR "
+                        + "AND severity IN ('high', 'critical')",
+                Integer.class, deviceId, hours);
+        return c != null ? c : 0;
+    }
+
+    public int countRecentWarnings(String deviceId, int hours) {
+        Integer c = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM client_events WHERE device_id = ? AND created_at >= NOW() - INTERVAL ? HOUR "
+                        + "AND severity = 'warning'",
+                Integer.class, deviceId, hours);
+        return c != null ? c : 0;
+    }
 }

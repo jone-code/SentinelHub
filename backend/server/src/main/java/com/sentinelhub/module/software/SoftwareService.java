@@ -3,6 +3,7 @@ package com.sentinelhub.module.software;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentinelhub.module.audit.AuditService;
+import com.sentinelhub.module.zerotrust.ZerotrustService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,12 +15,14 @@ public class SoftwareService {
     private final ClientEventRepository eventRepository;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
+    private final ZerotrustService zerotrustService;
 
     public SoftwareService(ClientEventRepository eventRepository, AuditService auditService,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper, ZerotrustService zerotrustService) {
         this.eventRepository = eventRepository;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
+        this.zerotrustService = zerotrustService;
     }
 
     @SuppressWarnings("unchecked")
@@ -39,6 +42,7 @@ public class SoftwareService {
             eventRepository.insert(tenantId, deviceId, type, severity, toJson(detail));
             auditService.log(tenantId, "agent", clientId, type, "device", deviceId, detail, null);
         }
+        zerotrustService.recomputeForDevice(tenantId, deviceId);
     }
 
     public List<Map<String, Object>> listEventsForAdmin(String tenantId, int page, int pageSize) {

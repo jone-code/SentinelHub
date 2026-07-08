@@ -53,6 +53,31 @@ public class AssetService {
         );
     }
 
+    public Map<String, Object> getTenantOverview(String tenantId) {
+        return Map.of(
+                "software_entries", assetRepository.countSoftwareInventory(tenantId),
+                "hardware_entries", assetRepository.countHardwareInventory(tenantId)
+        );
+    }
+
+    public List<Map<String, Object>> listSoftwareInventory(String tenantId, int page, int pageSize) {
+        int offset = Math.max(0, (page - 1) * pageSize);
+        return assetRepository.listSoftwareInventory(tenantId, pageSize, offset);
+    }
+
+    public int countSoftwareInventory(String tenantId) {
+        return assetRepository.countSoftwareInventory(tenantId);
+    }
+
+    public List<Map<String, Object>> listHardwareInventory(String tenantId, int page, int pageSize) {
+        int offset = Math.max(0, (page - 1) * pageSize);
+        return assetRepository.listHardwareInventory(tenantId, pageSize, offset);
+    }
+
+    public int countHardwareInventory(String tenantId) {
+        return assetRepository.countHardwareInventory(tenantId);
+    }
+
     private static String str(Object o) {
         return o != null ? o.toString() : null;
     }

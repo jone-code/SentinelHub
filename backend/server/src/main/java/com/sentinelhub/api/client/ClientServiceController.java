@@ -9,6 +9,8 @@ import com.sentinelhub.module.software.SoftwareService;
 import com.sentinelhub.module.compliance.ComplianceService;
 import com.sentinelhub.module.dlp.DlpService;
 import com.sentinelhub.module.nac.NacService;
+import com.sentinelhub.module.zerotrust.ZerotrustService;
+import com.sentinelhub.module.mdm.MdmService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,11 +33,14 @@ public class ClientServiceController {
     private final ComplianceService complianceService;
     private final DlpService dlpService;
     private final NacService nacService;
+    private final ZerotrustService zerotrustService;
+    private final MdmService mdmService;
 
     public ClientServiceController(IdentityService identityService, DeviceService deviceService,
                                    AssetService assetService, PolicyService policyService,
                                    SoftwareService softwareService, ComplianceService complianceService,
-                                   DlpService dlpService, NacService nacService) {
+                                   DlpService dlpService, NacService nacService,
+                                   ZerotrustService zerotrustService, MdmService mdmService) {
         this.identityService = identityService;
         this.deviceService = deviceService;
         this.assetService = assetService;
@@ -44,6 +49,8 @@ public class ClientServiceController {
         this.complianceService = complianceService;
         this.dlpService = dlpService;
         this.nacService = nacService;
+        this.zerotrustService = zerotrustService;
+        this.mdmService = mdmService;
     }
 
     @GetMapping("/info")
@@ -108,6 +115,28 @@ public class ClientServiceController {
         DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
                 .orElseThrow(() -> new IllegalArgumentException("device not registered"));
         return ApiResponse.ok(nacService.getRadiusForClient(device.tenantId()));
+    }
+
+    @GetMapping("/zt-policy")
+    public ApiResponse<Map<String, Object>> ztPolicy(@RequestParam("client_id") String clientId) {
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        return ApiResponse.ok(zerotrustService.getPolicyForClient(device.tenantId()));
+    }
+
+    @GetMapping("/mdm-profiles")
+    public ApiResponse<List<Map<String, Object>>> mdmProfiles(@RequestParam("client_id") String clientId) {
+        return ApiResponse.ok(mdmService.getProfilesForDevice(clientId));
+    }
+
+    @PostMapping("/report/mdm-applied")
+    public ApiResponse<Map<String, Object>> reportMdmApplied(@RequestBody Map<String, Object> body) {
+        String clientId = stringVal(body.get("client_id"));
+        String profileId = stringVal(body.get("profile_id"));
+        if (clientId == null || profileId == null) {
+            throw new IllegalArgumentException("client_id and profile_id required");
+        }
+        return ApiResponse.ok(mdmService.reportAppliedForClient(clientId, profileId));
     }
 
     @PostMapping("/report/dlp-evidence")

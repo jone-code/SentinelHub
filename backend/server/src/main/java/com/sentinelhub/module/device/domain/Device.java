@@ -14,6 +14,7 @@ public record Device(
         String status,
         Instant lastSeenAt,
         Integer complianceScore,
+        Integer trustScore,
         Instant createdAt
 ) {
 }

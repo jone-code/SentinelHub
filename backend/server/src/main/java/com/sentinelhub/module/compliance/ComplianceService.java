@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentinelhub.module.audit.AuditService;
 import com.sentinelhub.module.device.DeviceRepository;
+import com.sentinelhub.module.zerotrust.ZerotrustService;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -31,13 +32,16 @@ public class ComplianceService {
     private final DeviceRepository deviceRepository;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
+    private final ZerotrustService zerotrustService;
 
     public ComplianceService(ComplianceRepository complianceRepository, DeviceRepository deviceRepository,
-                             AuditService auditService, ObjectMapper objectMapper) {
+                             AuditService auditService, ObjectMapper objectMapper,
+                             ZerotrustService zerotrustService) {
         this.complianceRepository = complianceRepository;
         this.deviceRepository = deviceRepository;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
+        this.zerotrustService = zerotrustService;
     }
 
     public void backfillBaselines(String tenantId) {
@@ -129,6 +133,7 @@ public class ComplianceService {
         complianceRepository.insertResult(tenantId, deviceId, baselineId, score, passed, failed,
                 toJson(details), scannedAt);
         deviceRepository.updateComplianceScore(tenantId, deviceId, score);
+        zerotrustService.recomputeForDevice(tenantId, deviceId);
 
         auditService.log(tenantId, "agent", clientId, "compliance.scan", "device", deviceId,
                 Map.of("score", score, "passed", passed, "failed", failed), null);

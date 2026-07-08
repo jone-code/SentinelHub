@@ -38,6 +38,7 @@ class HomePage extends ConsumerWidget {
 
   Widget _buildContent(BuildContext context, local, Map<String, dynamic>? cloud, bool isDesktop) {
     final compliance = cloud?['compliance_score']?.toString() ?? '—';
+    final trust = cloud?['trust_score']?.toString() ?? '—';
     final pending = cloud?['pending_items']?.toString() ?? '0';
     final notifications = cloud?['unread_notifications']?.toString() ?? '0';
     final cloudOk = isDesktop ? (local?.cloudConnected == true) : cloud != null;
@@ -52,8 +53,14 @@ class HomePage extends ConsumerWidget {
           children: [
             _StatCard(title: '合规评分', value: compliance),
             const SizedBox(width: 12),
-            _StatCard(title: '待处理', value: pending),
+            _StatCard(title: '信任分', value: trust),
             const SizedBox(width: 12),
+            _StatCard(title: '待处理', value: pending),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
             _StatCard(title: '通知', value: notifications),
           ],
         ),
