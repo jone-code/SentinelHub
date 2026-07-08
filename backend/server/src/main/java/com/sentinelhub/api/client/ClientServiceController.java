@@ -1,4 +1,4 @@
-package com.sentinelhub.api.agent;
+package com.sentinelhub.api.client;
 
 import com.sentinelhub.common.dto.ApiResponse;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,18 +11,18 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * Agent API for endpoint clients (Windows/macOS/Linux PC devices).
- * Base path: /agent/v1
+ * PC client background service API — register, heartbeat, report.
+ * Base path: /api/client/v1/service
  */
 @RestController
-@RequestMapping("/agent/v1")
-public class AgentApiController {
+@RequestMapping("/api/client/v1/service")
+public class ClientServiceController {
 
     @GetMapping("/info")
     public ApiResponse<Map<String, String>> info() {
         return ApiResponse.ok(Map.of(
-                "client", "agent",
-                "description", "终端 Agent API — 供 PC/笔记本客户端调用"
+                "component", "background-service",
+                "description", "PC 客户端后台服务 API — 注册、心跳、上报"
         ));
     }
 
@@ -40,5 +40,15 @@ public class AgentApiController {
                 "server_time", java.time.Instant.now().toString(),
                 "commands", Collections.emptyList()
         ));
+    }
+
+    @PostMapping("/report/assets")
+    public ApiResponse<Map<String, String>> reportAssets(@RequestBody Map<String, Object> body) {
+        return ApiResponse.ok(Map.of("status", "accepted"));
+    }
+
+    @PostMapping("/report/events")
+    public ApiResponse<Map<String, String>> reportEvents(@RequestBody Map<String, Object> body) {
+        return ApiResponse.ok(Map.of("status", "accepted"));
     }
 }

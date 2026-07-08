@@ -13,7 +13,7 @@ export default function Devices() {
       columns={columns}
       dataSource={[]}
       rowKey="id"
-      locale={{ emptyText: '暂无设备，请部署 Agent 后自动纳管' }}
+      locale={{ emptyText: '暂无设备，请部署客户端后自动纳管' }}
     />
   );
 }

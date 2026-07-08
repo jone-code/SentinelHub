@@ -75,10 +75,10 @@ console.sentinel.example.com → console
 api.sentinel.example.com → sentinel-server
   /api/admin/v1  → 管理端
   /api/app/v1    → 移动端
-  /agent/v1      → PC 终端
+  /api/client/v1      → PC 终端
 
-# Agent 可选独立域名
-agent.sentinel.example.com → sentinel-server (/agent/*)
+# 客户端可选独立域名
+agent.sentinel.example.com → sentinel-server (/api/client/*)
 ```
 
 ### 3.4 资源建议（生产最小）
@@ -111,7 +111,7 @@ agent.sentinel.example.com → sentinel-server (/agent/*)
 
 - 分布式模式 4+ 节点，或单节点 + 外部备份
 
-## 5. Agent 分发
+## 5. 客户端分发
 
 ```
 https://agent.sentinel.example.com/download/
@@ -125,7 +125,7 @@ https://agent.sentinel.example.com/download/
 
 ## 6. 网络要求
 
-### 出站（Agent → 平台）
+### 出站（客户端 → 平台）
 
 | 目标 | 端口 | 协议 |
 |------|------|------|
@@ -155,7 +155,7 @@ https://agent.sentinel.example.com/download/
 
 | 指标 | 告警阈值 |
 |------|----------|
-| Agent 在线率 | &lt; 95% 持续 15min |
+| 客户端在线率 | &lt; 95% 持续 15min |
 | Gateway 5xx | &gt; 1% 持续 5min |
 | NATS 消费延迟 | &gt; 60s |
 | PG 连接数 | &gt; 80% max |

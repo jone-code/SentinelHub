@@ -3,9 +3,8 @@
 ## 1. 选型原则
 
 - **私有化友好**：核心组件可离线部署，不依赖公有云专有服务
-- **跨平台**：Agent 需覆盖 Windows / macOS / Linux
-- **高性能**：终端规模万级时，心跳、日志、策略下发需低延迟
-- **可维护**：后端统一 Java 生态，便于企业团队招聘与运维；Agent 使用 Go 保证轻量跨平台
+- **跨平台**：PC 客户端需覆盖 Windows / macOS / Linux
+- **可维护**：后端 Java 生态；PC 客户端 UI 用 Electron+React，后台服务用 Go
 
 ## 2. 技术栈总览
 
@@ -15,9 +14,9 @@
 ├─────────────┼──────────────────────────────────────────────────┤
 │ 管理控制台   │ React 18, TypeScript, Vite, Ant Design, Zustand  │
 │ 统一 API 服务 │ Spring Boot 3.3 单体 + 业务模块分包 (Java 21)        │
-│ API 通道     │ admin / app / agent 三端 REST API                    │
+│ API 通道     │ admin / app / client 三端 REST API                 │
 │ 业务模块     │ Spring 包结构 module.* (非独立微服务)                  │
-│ 终端 Agent   │ Go 1.22+（跨平台、低资源占用）                       │
+│ PC 安全客户端 │ Electron + React (UI) + Go (后台服务)               │
 │ 关系型数据库 │ MySQL 8.4                                          │
 │ 缓存         │ Redis 7                                            │
 │ 消息队列     │ NATS JetStream                                     │
@@ -52,7 +51,7 @@ backend/
         ├── api/
         │   ├── admin/   # 管理端 API — PC Web 控制台
         │   ├── app/     # 移动端 API — 手机 App
-        │   └── agent/   # 终端 API — PC Agent
+        │   └── client/   # 终端 API — PC 安全客户端
         └── module/
             ├── identity/
             ├── device/
@@ -66,7 +65,7 @@ backend/
 |------|------|------|
 | 管理控制台 | HTTPS `/api/admin/v1` | PC 浏览器 |
 | 手机 App | HTTPS `/api/app/v1` | iOS / Android |
-| PC Agent | HTTPS `/agent/v1` + mTLS | Windows / macOS / Linux |
+| PC 安全客户端 | HTTPS `/api/client/v1` + mTLS | Windows / macOS / Linux |
 | 模块间调用 | Spring Bean 注入 | 同进程，无网络开销 |
 | 异步事件 | NATS JetStream（可选） | 审计、告警通知 |
 
@@ -87,25 +86,22 @@ backend/
 |--------|------|------|
 | 管理控制台（PC） | `console/` | React 18 + TypeScript + Vite + Ant Design |
 | 手机管理 App | `mobile/` | React Native + Expo + TypeScript |
-| PC 终端 Agent | `agent/` | Go 1.22+ |
+| PC 安全客户端 | `client/` | Electron + React (UI) + Go (后台服务) |
 
-### 3.6 Agent：Go
+### 3.6 PC 客户端架构
 
-终端 Agent 保持 **Go** 实现，原因：
-
-- 单二进制跨平台分发，体积小、资源占用低
-- 与安全管控类竞品（CrowdStrike、osquery 等）技术路线一致
-- 通过 `proto/` 定义的 HTTP/gRPC 契约与 Java 后端通信，语言解耦
+PC 安全客户端 = **Electron 桌面 UI** + **Go 后台服务**：
 
 ```
-agent/
-├── core/           # 生命周期、升级、配置拉取
-├── transport/      # 与云端通信、mTLS
-├── policy/         # 本地策略引擎
-├── collectors/     # 资产、软件、合规采集
-├── enforcers/      # DLP/NAC/软件管控执行插件
-└── platform/       # windows/darwin/linux
+client/
+├── electron/ + src/    # Electron + React 页面（首页、合规、设置等）
+└── service/            # Go 后台服务（心跳、策略执行、数据采集）
+    ├── core/
+    ├── collectors/
+    └── enforcers/
 ```
+
+详见 [10-client-technology-stack.md](./10-client-technology-stack.md)。
 
 ## 4. 核心依赖版本
 
@@ -113,7 +109,8 @@ agent/
 |------|------|
 | React | 18.x |
 | React Native (Expo) | 0.76.x / SDK 52 |
-| Go (Agent) | 1.22+ |
+| Electron | 33.x |
+| Go (客户端后台服务) | 1.22+ |
 | Java | 21 (LTS) |
 | Spring Boot | 3.3.5 |
 | Spring Cloud | 2023.0.x (按需引入) |

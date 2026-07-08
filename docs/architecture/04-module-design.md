@@ -12,7 +12,7 @@
 |--------|----------|--------|------|
 | `api.admin` | `/api/admin/v1` | Web 管理控制台（PC） | P0 |
 | `api.app` | `/api/app/v1` | 手机管理 App | P0 |
-| `api.agent` | `/agent/v1` | PC 终端 Agent | P0 |
+| `api.client` | `/api/client/v1` | PC 安全客户端 | P0 |
 
 ### 1.2 业务模块层
 
@@ -46,8 +46,8 @@ backend/server/src/main/java/com/sentinelhub/
 │   ├── app/                    # 移动端 Controller
 │   │   ├── AppDeviceController.java
 │   │   └── ...
-│   └── agent/                  # 终端 Controller
-│       ├── AgentApiController.java
+│   └── client/                  # 终端 Controller
+│       ├── ClientServiceController.java
 │       └── ...
 └── module/
     ├── device/
@@ -58,7 +58,7 @@ backend/server/src/main/java/com/sentinelhub/
     └── ...
 ```
 
-**调用关系**：`api.*` → `module.*`，禁止 `api.admin` 直接访问 `api.agent` 的包。
+**调用关系**：`api.*` → `module.*`，禁止 `api.admin` 直接访问 `api.client` 的包。
 
 ## 3. 业务模块详情
 
@@ -79,7 +79,7 @@ backend/server/src/main/java/com/sentinelhub/
 **API 暴露**：
 - Admin: `GET/POST /api/admin/v1/devices`
 - App: `GET /api/app/v1/devices`
-- Agent: `POST /agent/v1/register`, `POST /agent/v1/heartbeat`
+- Agent: `POST /api/client/v1/register`, `POST /api/client/v1/heartbeat`
 
 ---
 
@@ -89,7 +89,7 @@ backend/server/src/main/java/com/sentinelhub/
 
 **API 暴露**：
 - Admin: `GET /api/admin/v1/assets/**`
-- Agent: `POST /agent/v1/report/assets`
+- Agent: `POST /api/client/v1/report/assets`
 
 ---
 
@@ -105,7 +105,7 @@ backend/server/src/main/java/com/sentinelhub/
 
 ### M06~M14 其他模块
 
-策略、软件管控、合规、DLP、NAC、零信任、MDM、远程、AI — 业务逻辑均在 `module.*` 实现，管理类 API 走 `api.admin`，终端执行走 `api.agent`，移动端查看走 `api.app`。
+策略、软件管控、合规、DLP、NAC、零信任、MDM、远程、AI — 业务逻辑均在 `module.*` 实现，管理类 API 走 `api.admin`，终端执行走 `api.client`，移动端查看走 `api.app`。
 
 ## 4. 三端 API 差异示例（设备列表）
 
@@ -113,7 +113,7 @@ backend/server/src/main/java/com/sentinelhub/
 |----|------|------|
 | Admin | `GET /api/admin/v1/devices` | 全量字段、分页、导出、管理操作 |
 | App | `GET /api/app/v1/devices` | 精简字段、仅当前用户相关设备 |
-| Agent | `POST /agent/v1/heartbeat` | 上报状态、拉取指令，非查询列表 |
+| Agent | `POST /api/client/v1/heartbeat` | 上报状态、拉取指令，非查询列表 |
 
 ## 5. 模块依赖
 
@@ -121,7 +121,7 @@ backend/server/src/main/java/com/sentinelhub/
 graph LR
     AdminAPI[api.admin] --> modules
     AppAPI[api.app] --> modules
-    AgentAPI[api.agent] --> modules
+    ClientAPI[api.client] --> modules
 
     Device --> Policy
     Device --> Asset
@@ -135,7 +135,7 @@ graph LR
 ## 6. 开发规范
 
 1. 新业务先在 `module.{name}` 实现 Service/Repository
-2. 按客户端在 `api.admin` / `api.app` / `api.agent` 添加 Controller
+2. 按客户端在 `api.admin` / `api.app` / `api.client` 添加 Controller
 3. 禁止跨 module 直接访问 Repository，通过 Service 接口调用
 4. 所有写操作调用 `module.audit.AuditService` 记录
 5. 数据库迁移：`server/src/main/resources/db/migration/`

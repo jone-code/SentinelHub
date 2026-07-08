@@ -9,8 +9,8 @@ SentinelHub 采用 **单一 API 服务、内部分业务模块** 的架构，避
 │                    sentinel-server (:8080)                   │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │                    API 接入层                          │  │
-│  │  api.admin   api.app   api.agent                       │  │
-│  │  管理端 PC    手机 App   PC 终端 Agent                   │  │
+│  │  api.admin   api.app   api.client                       │  │
+│  │  管理端 PC    手机 App   PC 安全客户端                   │  │
 │  └─────────────────────────┬─────────────────────────────┘  │
 │  ┌─────────────────────────▼─────────────────────────────┐  │
 │  │                   业务模块层 (module.*)                  │  │
@@ -28,7 +28,7 @@ SentinelHub 采用 **单一 API 服务、内部分业务模块** 的架构，避
 |----|----------|--------|----------|
 | **管理端** | `/api/admin/v1` | Web 控制台（PC 浏览器） | JWT / OIDC |
 | **移动端** | `/api/app/v1` | 手机管理 App（iOS/Android） | JWT + 设备绑定 |
-| **终端** | `/agent/v1` | PC Agent（Win/macOS/Linux） | mTLS + Agent 证书 |
+| **终端** | `/api/client/v1` | PC 安全客户端（Win/macOS/Linux） | mTLS + Agent 证书 |
 
 三个 API 层共享同一套 `module.*` 业务逻辑，仅在入参校验、响应裁剪、权限控制上有差异。
 
@@ -42,7 +42,7 @@ Console (PC) → POST /api/admin/v1/policies
   → module.policy.PolicyService
   → MySQL
   → 发布内部事件 → module.audit 记录
-  → Agent 心跳拉取 → POST /agent/v1/heartbeat 返回策略包
+  → 客户端心跳拉取 → POST /api/client/v1/heartbeat 返回策略包
 ```
 
 ### 3.2 手机 App 查看设备
@@ -57,12 +57,12 @@ Mobile App → GET /api/app/v1/devices/summary
 ### 3.3 终端注册与心跳
 
 ```
-PC Agent → POST /agent/v1/register
-  → api.agent.AgentApiController
+PC 安全客户端 → POST /api/client/v1/register
+  → api.client.ClientServiceController
   → module.device.DeviceService.register()
   → 签发 mTLS 证书，触发 module.asset 采集
 
-周期心跳 → POST /agent/v1/heartbeat
+周期心跳 → POST /api/client/v1/heartbeat
   → 返回策略增量、合规任务、远程指令
 ```
 
@@ -73,13 +73,13 @@ flowchart TB
     subgraph clients [客户端]
         Console[管理控制台 PC]
         MobileApp[手机 App]
-        Agent[PC Agent]
+        Agent[PC 安全客户端]
     end
 
     subgraph server [sentinel-server 统一 API 服务]
         AdminAPI[api.admin]
         AppAPI[api.app]
-        AgentAPI[api.agent]
+        ClientAPI[api.client]
 
         subgraph modules [业务模块 module.*]
             Identity[identity]
@@ -100,11 +100,11 @@ flowchart TB
 
     Console --> AdminAPI
     MobileApp --> AppAPI
-    Agent --> AgentAPI
+    Client --> ClientAPI
 
     AdminAPI --> modules
     AppAPI --> modules
-    AgentAPI --> modules
+    ClientAPI --> modules
 
     modules --> MySQL
     modules --> Redis

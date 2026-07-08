@@ -12,7 +12,7 @@ backend/
         ├── api/
         │   ├── admin/     # 管理端 API（Web 控制台）
         │   ├── app/       # 移动端 API（手机 App）
-        │   └── agent/     # 终端 API（PC Agent）
+        │   └── client/     # 终端 API（PC 安全客户端）
         └── module/
             ├── identity/  # 身份租户
             ├── device/    # 设备管控
@@ -28,7 +28,7 @@ backend/
 |--------|----------|------|
 | 管理端（PC 浏览器） | `/api/admin/v1` | Web 控制台 |
 | 移动端（手机 App） | `/api/app/v1` | iOS / Android 管理 App |
-| 终端（PC Agent） | `/agent/v1` | Windows / macOS / Linux 客户端 |
+| 终端（PC 安全客户端） | `/api/client/v1` | Windows / macOS / Linux 客户端 |
 
 ## 构建与运行
 
@@ -45,7 +45,7 @@ backend/
 curl http://localhost:8080/health
 curl http://localhost:8080/api/admin/v1/info
 curl http://localhost:8080/api/app/v1/info
-curl http://localhost:8080/agent/v1/info
+curl http://localhost:8080/api/client/v1/info
 ```
 
 ## 业务模块
@@ -66,4 +66,4 @@ curl http://localhost:8080/agent/v1/info
 | `module.remote` | 远程控制 |
 | `module.ai` | AI 安全（预留） |
 
-API 层（`api.admin` / `api.app` / `api.agent`）负责协议适配，调用 `module.*` 业务服务。
+API 层（`api.admin` / `api.app` / `api.client`）负责协议适配，调用 `module.*` 业务服务。

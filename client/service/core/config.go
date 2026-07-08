@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-// Config holds agent runtime configuration.
+// Config holds client background service configuration.
 type Config struct {
 	ServerURL         string
-	AgentID           string
+	ClientID          string
 	TenantToken       string
 	Version           string
 	HeartbeatInterval time.Duration
@@ -16,12 +16,12 @@ type Config struct {
 
 // LoadConfig reads configuration from environment variables.
 func LoadConfig() Config {
-	interval, _ := time.ParseDuration(getEnv("AGENT_HEARTBEAT_INTERVAL", "60s"))
+	interval, _ := time.ParseDuration(getEnv("CLIENT_HEARTBEAT_INTERVAL", "60s"))
 	return Config{
-		ServerURL:         getEnv("AGENT_SERVER_URL", "https://localhost:8080"),
-		AgentID:           getEnv("AGENT_ID", ""),
-		TenantToken:       getEnv("AGENT_TENANT_TOKEN", ""),
-		Version:           getEnv("AGENT_VERSION", "0.1.0-dev"),
+		ServerURL:         getEnv("CLIENT_SERVER_URL", "http://localhost:8080"),
+		ClientID:          getEnv("CLIENT_ID", ""),
+		TenantToken:       getEnv("CLIENT_TENANT_TOKEN", ""),
+		Version:           getEnv("CLIENT_VERSION", "0.1.0-dev"),
 		HeartbeatInterval: interval,
 	}
 }

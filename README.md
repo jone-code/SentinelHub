@@ -10,7 +10,7 @@
 |----|----------|--------|
 | 管理端 | `/api/admin/v1` | Web 控制台（PC 浏览器） |
 | 移动端 | `/api/app/v1` | 手机管理 App（iOS/Android） |
-| 终端 | `/agent/v1` | PC Agent（Windows/macOS/Linux） |
+| 终端 | `/api/client/v1` | PC 安全客户端（Windows/macOS/Linux） |
 
 ## 技术栈
 
@@ -19,7 +19,7 @@
 | 后端 | Java 21, Spring Boot 3.3, Maven |
 | 管理控制台 | React 18, TypeScript, Vite, Ant Design |
 | 手机 App | React Native, Expo, TypeScript |
-| PC Agent | Go 1.22+ |
+| PC 安全客户端 | Electron + React + Go service |
 | 存储 | MySQL, Redis, ClickHouse, MinIO |
 
 > 客户端详细说明见 [docs/architecture/10-client-technology-stack.md](./docs/architecture/10-client-technology-stack.md)
@@ -33,11 +33,11 @@ SentinelHub/
 │   └── server/         # 统一 API 服务
 │       ├── api/admin/  # 管理端 API
 │       ├── api/app/    # 移动端 API
-│       ├── api/agent/  # 终端 API
+│       ├── api/client/ # PC 客户端 API（UI + 后台服务）
 │       └── module/     # 业务模块（device, asset, ...）
 ├── console/            # PC 管理控制台（React）
 ├── mobile/             # 手机管理 App（React Native，规划中）
-├── agent/              # PC 终端 Agent（Go）
+├── client/             # PC 安全客户端（Electron UI + Go 后台服务）
 ├── deploy/             # Docker Compose / 迁移脚本
 └── docs/               # 架构文档
 ```
@@ -55,7 +55,8 @@ cd console && npm install && npm run dev        # 启动控制台
 curl http://localhost:8080/health
 curl http://localhost:8080/api/admin/v1/info
 curl http://localhost:8080/api/app/v1/info
-curl http://localhost:8080/agent/v1/info
+curl http://localhost:8080/api/client/v1/info
+curl http://localhost:8080/api/client/v1/status
 ```
 
 ## 架构文档

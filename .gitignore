@@ -20,6 +20,8 @@ agent/build/
 # Node
 node_modules/
 console/dist/
+client/dist/
+client/node_modules/
 console/.vite/
 *.log
 

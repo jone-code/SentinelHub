@@ -7,7 +7,8 @@
 ```
 /api/admin/v1/**    管理端（PC Web 控制台）
 /api/app/v1/**      移动端（手机 App）
-/agent/v1/**        终端（PC Agent）
+/api/client/v1/**           PC 安全客户端（UI 页面）
+/api/client/v1/service/**   PC 客户端后台服务
 /health             健康检查（公共）
 ```
 
@@ -28,7 +29,8 @@
 |------|------|
 | `/api/admin/v1` | `Authorization: Bearer <JWT>` |
 | `/api/app/v1` | `Authorization: Bearer <JWT>` + 可选 `X-Device-Id` |
-| `/agent/v1` | mTLS 客户端证书 + `X-Agent-Id` |
+| `/api/client/v1` | 本机会话 / 设备令牌（UI 页面） |
+| `/api/client/v1/service` | mTLS 客户端证书 + `X-Client-Id` |
 
 ## 4. 管理端 API（`/api/admin/v1`）
 
@@ -60,17 +62,28 @@
 
 移动端响应字段较管理端精简，不暴露敏感策略细节。
 
-## 6. 终端 API（`/agent/v1`）
+## 6. PC 安全客户端 API（`/api/client/v1`）
 
-面向 Windows/macOS/Linux PC Agent。
+面向安装在员工 PC 上的桌面客户端，分 **UI 接口** 和 **后台服务接口** 两层。
+
+### 6.1 UI 接口 — 供桌面页面展示
 
 | Method | Path | 说明 |
 |--------|------|------|
-| POST | `/agent/v1/register` | 首次注册 |
-| POST | `/agent/v1/heartbeat` | 心跳与指令拉取 |
-| POST | `/agent/v1/report/assets` | 资产上报 |
-| POST | `/agent/v1/report/events` | 事件批量上报 |
-| GET | `/agent/v1/policy-bundle` | 下载策略包 |
+| GET | `/api/client/v1/info` | 客户端信息 |
+| GET | `/api/client/v1/status` | 安全状态概览（合规分、通知数） |
+| GET | `/api/client/v1/compliance` | 合规检查明细 |
+| GET | `/api/client/v1/notifications` | 安全通知列表（规划） |
+
+### 6.2 后台服务接口 — 供 Go 服务进程
+
+| Method | Path | 说明 |
+|--------|------|------|
+| POST | `/api/client/v1/service/register` | 首次注册 |
+| POST | `/api/client/v1/service/heartbeat` | 心跳与指令拉取 |
+| POST | `/api/client/v1/service/report/assets` | 资产上报 |
+| POST | `/api/client/v1/service/report/events` | 事件批量上报 |
+| GET | `/api/client/v1/service/policy-bundle` | 下载策略包（规划） |
 
 ### 心跳响应
 
@@ -116,6 +129,6 @@ WSS /api/admin/v1/ws?token=...
 
 ## 10. 版本演进
 
-- 各通道独立版本：`/api/admin/v1`、`/api/app/v1`、`/agent/v1`
+- 各通道独立版本：`/api/admin/v1`、`/api/app/v1`、`/api/client/v1`
 - 向后兼容至少 2 个大版本
-- Agent 协议变更需同步更新 `agent/` 与 `proto/agent/`
+- 客户端协议变更需同步更新 `client/service/` 与 `proto/agent/`

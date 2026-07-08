@@ -10,7 +10,7 @@
 |--------|----------|--------|
 | `api.admin` | `/api/admin/v1` | Web 管理控制台（PC） |
 | `api.app` | `/api/app/v1` | 手机管理 App |
-| `api.agent` | `/agent/v1` | PC 终端 Agent |
+| `api.client` | `/api/client/v1` | PC 安全客户端 |
 
 ### 业务模块层
 
@@ -36,12 +36,12 @@
 |------|------|------|
 | `console/` | React + Ant Design | PC 管理控制台 |
 | `mobile/` | React Native + Expo | 手机管理 App（规划） |
-| `agent/` | Go | PC 终端 Agent |
+| `client/` | Go | PC 安全客户端 |
 
 ## 下一步（P0）
 
 1. `module.identity` + `api.admin` 登录/RBAC
-2. `module.device` + `api.agent` 注册/心跳
+2. `module.device` + `api.client` 注册/心跳
 3. `module.asset` 资产采集
 4. `module.audit` 审计管道
 5. `api.app` 移动端设备概览

@@ -24,4 +24,4 @@ sentinelhub:
   api:
     admin-prefix: /api/admin/v1
     app-prefix: /api/app/v1
-    agent-prefix: /agent/v1
+    client-prefix: /api/client/v1
