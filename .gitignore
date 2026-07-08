@@ -1,0 +1,45 @@
+# Java
+backend/target/
+backend/**/target/
+*.class
+*.jar
+!backend/.mvn/wrapper/maven-wrapper.jar
+
+# Maven
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+release.properties
+
+# Build output
+/bin/
+client/native/target/
+
+# Node
+node_modules/
+console/dist/
+client/dist/
+client/.dart_tool/
+client/build/
+client/.flutter-plugins-dependencies
+console/.vite/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+.DS_Store
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Docker
+deploy/docker-compose/data/
+
+# Secrets
+*.pem
+*.key

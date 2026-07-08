@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/jone-code/SentinelHub/proto/gen/agent/v1;agentv1";
+option java_package = "com.sentinelhub.proto.agent.v1";
+option java_multiple_files = true;
+
+// Agent registration and sync protocol.
+
+message RegisterRequest {
+  string tenant_token = 1;
+  string hardware_id = 2;
+  string hostname = 3;
+  string os_type = 4;
+  string os_version = 5;
+  map<string, string> metadata = 6;
+}
+
+message RegisterResponse {
+  string device_id = 1;
+  string agent_id = 2;
+  string cert_pem = 3;
+  string config_version = 4;
+}
+
+message HeartbeatRequest {
+  string agent_id = 1;
+  string config_version = 2;
+  string policy_version = 3;
+  AgentStatus status = 4;
+}
+
+message AgentStatus {
+  string uptime_sec = 1;
+  int32 cpu_percent = 2;
+  int64 memory_used_mb = 3;
+}
+
+message HeartbeatResponse {
+  string server_time = 1;
+  string config_version = 2;
+  PolicyBundle policy_bundle = 3;
+  repeated Command commands = 4;
+}
+
+message PolicyBundle {
+  string version = 1;
+  string hash = 2;
+  string url = 3;
+}
+
+message Command {
+  string id = 1;
+  string type = 2;
+  bytes params = 3;
+  string expires_at = 4;
+}
+
+service AgentService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}

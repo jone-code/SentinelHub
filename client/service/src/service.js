@@ -1,0 +1,187 @@
+import { collectAssets } from './collectors/index.js';
+import { resolveNativeBin } from './native-bridge.js';
+import { LocalServer } from './local-server.js';
+
+/**
+ * PC client background service — orchestration layer.
+ * Cloud API + local IPC + native sidecar dispatch.
+ */
+export class ClientService {
+  /** @param {ReturnType<import('./config.js').loadConfig>} config */
+  constructor(config) {
+    this.config = config;
+    this.heartbeatTimer = null;
+    this.assetTimer = null;
+    this.running = false;
+    /** @type {LocalServer | null} */
+    this.localServer = null;
+    /** @type {string | null} */
+    this.nativeBin = null;
+    this.state = {
+      startedAt: null,
+      lastHeartbeatAt: null,
+      lastHeartbeatOk: false,
+      lastAssetAt: null,
+      cloudConnected: false,
+      nativeAvailable: false,
+      clientId: config.clientId,
+    };
+    /** @type {object | null} */
+    this.assets = null;
+  }
+
+  getLocalStatus() {
+    return {
+      running: this.running,
+      version: this.config.version,
+      client_id: this.state.clientId || null,
+      cloud: {
+        server_url: this.config.serverUrl,
+        connected: this.state.cloudConnected,
+        last_heartbeat_at: this.state.lastHeartbeatAt,
+      },
+      native: {
+        available: this.state.nativeAvailable,
+        bin: this.nativeBin,
+      },
+      assets: {
+        collected_at: this.state.lastAssetAt,
+        software_count: this.assets?.software?.length ?? 0,
+      },
+      started_at: this.state.startedAt,
+    };
+  }
+
+  async start() {
+    if (this.running) return;
+    this.running = true;
+    this.state.startedAt = new Date().toISOString();
+
+    console.log(`[sentinel-service] starting v${this.config.version}`);
+    console.log(`[sentinel-service] cloud: ${this.config.serverUrl}`);
+
+    this.nativeBin = await resolveNativeBin(this.config.nativeBin);
+    this.state.nativeAvailable = Boolean(this.nativeBin);
+    if (this.nativeBin) {
+      console.log(`[sentinel-service] native sidecar: ${this.nativeBin}`);
+    } else {
+      console.log('[sentinel-service] native sidecar not found, using Node collectors');
+    }
+
+    this.localServer = new LocalServer({
+      host: this.config.localHost,
+      port: this.config.localPort,
+      getStatus: () => this.getLocalStatus(),
+      getAssets: () => this.assets,
+    });
+    await this.localServer.start();
+
+    if (!this.state.clientId) {
+      await this.register();
+    }
+
+    await this.collectAndReportAssets();
+    await this.heartbeat();
+
+    this.heartbeatTimer = setInterval(() => this.heartbeat(), this.config.heartbeatIntervalMs);
+    this.assetTimer = setInterval(() => this.collectAndReportAssets(), this.config.assetCollectIntervalMs);
+  }
+
+  async stop() {
+    this.running = false;
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    if (this.assetTimer) {
+      clearInterval(this.assetTimer);
+      this.assetTimer = null;
+    }
+    if (this.localServer) {
+      await this.localServer.stop();
+      this.localServer = null;
+    }
+    console.log('[sentinel-service] stopped');
+  }
+
+  async register() {
+    const url = `${this.config.serverUrl}/api/client/v1/service/register`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_token: this.config.tenantToken,
+          version: this.config.version,
+          client_id: this.config.clientId || undefined,
+        }),
+      });
+      const body = await res.json();
+      const clientId = body?.data?.client_id;
+      if (clientId) {
+        this.state.clientId = clientId;
+        this.config.clientId = clientId;
+        console.log(`[sentinel-service] registered client_id=${clientId}`);
+      }
+    } catch (err) {
+      console.error('[sentinel-service] register failed:', err.message);
+    }
+  }
+
+  async heartbeat() {
+    const url = `${this.config.serverUrl}/api/client/v1/service/heartbeat`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: this.state.clientId,
+          version: this.config.version,
+        }),
+      });
+      const body = await res.json();
+      this.state.lastHeartbeatAt = new Date().toISOString();
+      this.state.lastHeartbeatOk = res.ok;
+      this.state.cloudConnected = res.ok;
+      console.log('[sentinel-service] heartbeat ok', body?.data?.server_time ?? res.status);
+    } catch (err) {
+      this.state.lastHeartbeatAt = new Date().toISOString();
+      this.state.lastHeartbeatOk = false;
+      this.state.cloudConnected = false;
+      console.error('[sentinel-service] heartbeat failed:', err.message);
+    }
+  }
+
+  async collectAndReportAssets() {
+    try {
+      this.assets = await collectAssets(this.nativeBin);
+      this.state.lastAssetAt = this.assets.collected_at;
+      console.log(
+        `[sentinel-service] assets collected (${this.assets.source}), software=${this.assets.software?.length ?? 0}`,
+      );
+      await this.reportAssets(this.assets);
+    } catch (err) {
+      console.error('[sentinel-service] asset collect failed:', err.message);
+    }
+  }
+
+  /** @param {object} assets */
+  async reportAssets(assets) {
+    const url = `${this.config.serverUrl}/api/client/v1/service/report/assets`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: this.state.clientId,
+          assets,
+        }),
+      });
+      if (!res.ok) {
+        console.warn('[sentinel-service] asset report status', res.status);
+      }
+    } catch (err) {
+      console.error('[sentinel-service] asset report failed:', err.message);
+    }
+  }
+}

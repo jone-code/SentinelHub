@@ -1,0 +1,10 @@
+# Android
+
+由 Flutter 管理。首次开发请在本目录执行：
+
+```bash
+cd ..
+flutter create . --platforms=android,ios,windows,macos,linux
+```
+
+（若平台工程尚未生成）
