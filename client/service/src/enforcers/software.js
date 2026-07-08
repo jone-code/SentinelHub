@@ -45,33 +45,60 @@ export async function enforceSoftware(nativeBin, policy) {
 }
 
 /**
- * Node fallback — Linux /proc scan only.
+ * Node fallback — Linux /proc scan with optional process termination.
  */
 async function enforceSoftwareNode(blacklist, action) {
   const processes = await listProcessesNode();
-  const violations = [];
+  /** @type {Map<string, {process: string, matched_rule: string, action: string, blocked: boolean, terminated_pids: number[]}>} */
+  const violations = new Map();
+
   for (const proc of processes) {
-    const matched = matchBlacklist(proc, blacklist);
-    if (matched) {
-      violations.push({ process: proc, matched_rule: matched, action });
+    const matched = matchBlacklist(proc.name, blacklist);
+    if (!matched) continue;
+
+    const key = normalize(proc.name);
+    const entry = violations.get(key) ?? {
+      process: proc.name,
+      matched_rule: matched,
+      action,
+      blocked: false,
+      terminated_pids: [],
+    };
+
+    if (action === 'block') {
+      const killed = await terminatePid(proc.pid);
+      if (killed) {
+        entry.blocked = true;
+        entry.terminated_pids.push(proc.pid);
+      }
     }
+    violations.set(key, entry);
   }
-  return { checked_at: new Date().toISOString(), violations };
+
+  return {
+    checked_at: new Date().toISOString(),
+    violations: [...violations.values()],
+  };
 }
 
+/**
+ * @returns {Promise<Array<{pid: number, name: string}>>}
+ */
 async function listProcessesNode() {
   if (process.platform !== 'linux') {
     return [];
   }
   const { readdir, readFile } = await import('node:fs/promises');
-  const names = new Set();
+  const processes = [];
   try {
     const entries = await readdir('/proc');
-    for (const pid of entries) {
-      if (!/^\d+$/.test(pid)) continue;
+    for (const pidStr of entries) {
+      if (!/^\d+$/.test(pidStr)) continue;
+      const pid = Number(pidStr);
+      if (pid <= 1) continue;
       try {
         const comm = await readFile(`/proc/${pid}/comm`, 'utf8');
-        names.add(comm.trim());
+        processes.push({ pid, name: comm.trim() });
       } catch {
         // ignore
       }
@@ -79,7 +106,20 @@ async function listProcessesNode() {
   } catch {
     return [];
   }
-  return [...names];
+  return processes;
+}
+
+/**
+ * @param {number} pid
+ */
+async function terminatePid(pid) {
+  if (pid <= 1) return false;
+  try {
+    process.kill(pid, 'SIGTERM');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function normalize(name) {
@@ -98,16 +138,18 @@ function matchBlacklist(process, blacklist) {
 
 /**
  * Convert violations to cloud event payloads.
- * @param {Array<{process: string, matched_rule: string, action: string}>} violations
+ * @param {Array<{process: string, matched_rule: string, action: string, blocked?: boolean, terminated_pids?: number[]}>} violations
  */
 export function violationsToEvents(violations) {
   return violations.map((v) => ({
-    event_type: 'software.blacklist_detected',
+    event_type: v.blocked ? 'software.process_blocked' : 'software.blacklist_detected',
     severity: v.action === 'block' ? 'critical' : 'warning',
     detail: {
       process: v.process,
       matched_rule: v.matched_rule,
       action: v.action,
+      blocked: Boolean(v.blocked),
+      terminated_pids: v.terminated_pids ?? [],
     },
   }));
 }

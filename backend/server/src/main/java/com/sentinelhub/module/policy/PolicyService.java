@@ -5,6 +5,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentinelhub.module.audit.AuditService;
 import com.sentinelhub.module.device.DeviceRepository;
+import com.sentinelhub.module.device.DeviceScopeRepository;
+import com.sentinelhub.module.device.domain.Device;
 import com.sentinelhub.module.policy.domain.Policy;
 import com.sentinelhub.module.policy.domain.PolicyBundle;
 import org.springframework.stereotype.Service;
@@ -17,19 +19,25 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class PolicyService {
 
     private final PolicyRepository policyRepository;
     private final DeviceRepository deviceRepository;
+    private final DeviceScopeRepository deviceScopeRepository;
+    private final PolicyScopeMatcher policyScopeMatcher;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
 
     public PolicyService(PolicyRepository policyRepository, DeviceRepository deviceRepository,
+                         DeviceScopeRepository deviceScopeRepository, PolicyScopeMatcher policyScopeMatcher,
                          AuditService auditService, ObjectMapper objectMapper) {
         this.policyRepository = policyRepository;
         this.deviceRepository = deviceRepository;
+        this.deviceScopeRepository = deviceScopeRepository;
+        this.policyScopeMatcher = policyScopeMatcher;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
     }
@@ -45,22 +53,25 @@ public class PolicyService {
     }
 
     public Map<String, Object> createPolicy(String tenantId, String userId, String name, String type,
-                                              Map<String, Object> content, int priority) {
+                                              Map<String, Object> content, Map<String, Object> scope,
+                                              int priority) {
         String contentJson = toJson(content != null ? content : defaultContent(type));
-        Policy p = policyRepository.insert(tenantId, name, type, contentJson, "{}", priority, userId);
+        String scopeJson = toJson(normalizeScope(scope));
+        Policy p = policyRepository.insert(tenantId, name, type, contentJson, scopeJson, priority, userId);
         auditService.log(tenantId, "user", userId, "policy.create", "policy", p.id(),
                 Map.of("name", name, "type", type), null);
         return toView(p);
     }
 
     public Map<String, Object> updatePolicy(String tenantId, String userId, String id, String name,
-                                            Map<String, Object> content, int priority) {
+                                            Map<String, Object> content, Map<String, Object> scope,
+                                            int priority) {
         Policy existing = policyRepository.findById(tenantId, id)
                 .orElseThrow(() -> new IllegalArgumentException("policy not found"));
         if (!"draft".equals(existing.status())) {
             throw new IllegalArgumentException("only draft policies can be edited");
         }
-        policyRepository.updateDraft(tenantId, id, name, toJson(content), priority);
+        policyRepository.updateDraft(tenantId, id, name, toJson(content), toJson(normalizeScope(scope)), priority);
         auditService.log(tenantId, "user", userId, "policy.update", "policy", id, Map.of("name", name), null);
         return getPolicy(tenantId, id);
     }
@@ -84,40 +95,36 @@ public class PolicyService {
 
     public Map<String, Object> getBundleSummaryForClient(String clientId) {
         return deviceRepository.findByAgentIdAny(clientId)
-                .flatMap(d -> policyRepository.findBundle(d.tenantId()))
-                .map(b -> Map.<String, Object>of(
-                        "version", b.version(),
-                        "hash", b.contentHash()
-                ))
+                .flatMap(device -> policyRepository.findBundle(device.tenantId())
+                        .map(bundle -> {
+                            Map<String, Object> content = buildDeviceBundleContent(device);
+                            return Map.<String, Object>of(
+                                    "version", bundle.version(),
+                                    "hash", sha256(toJson(content))
+                            );
+                        }))
                 .orElse(Map.of());
     }
 
     public Map<String, Object> getFullBundleForClient(String clientId) {
-        var device = deviceRepository.findByAgentIdAny(clientId)
+        Device device = deviceRepository.findByAgentIdAny(clientId)
                 .orElseThrow(() -> new IllegalArgumentException("device not registered"));
         PolicyBundle bundle = policyRepository.findBundle(device.tenantId())
                 .orElseThrow(() -> new IllegalArgumentException("no policy bundle published"));
-        Map<String, Object> content = parseJson(bundle.contentJson());
+        Map<String, Object> content = buildDeviceBundleContent(device);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rules = (Map<String, Object>) content.getOrDefault("rules", Map.of());
         return Map.of(
                 "version", bundle.version(),
-                "hash", bundle.contentHash(),
+                "hash", sha256(toJson(content)),
                 "published_at", bundle.publishedAt().toString(),
-                "rules", content.getOrDefault("rules", Map.of())
+                "rules", rules
         );
     }
 
     public PolicyBundle rebuildTenantBundle(String tenantId) {
         List<Policy> published = policyRepository.listPublished(tenantId);
-        Map<String, Object> rules = new LinkedHashMap<>();
-        for (Policy p : published) {
-            Map<String, Object> content = parseJson(p.contentJson());
-            rules.put(p.type(), Map.of(
-                    "policy_id", p.id(),
-                    "name", p.name(),
-                    "priority", p.priority(),
-                    "config", content
-            ));
-        }
+        Map<String, Object> rules = buildRulesMap(published);
         Map<String, Object> bundleContent = Map.of(
                 "tenant_id", tenantId,
                 "generated_at", Instant.now().toString(),
@@ -139,8 +146,38 @@ public class PolicyService {
                 "whitelist", List.of(),
                 "action", "alert"
         );
-        Map<String, Object> created = createPolicy(tenantId, userId, "默认软件黑名单", "software", content, 100);
+        Map<String, Object> created = createPolicy(tenantId, userId, "默认软件黑名单", "software", content,
+                Map.of("mode", "all"), 100);
         publishPolicy(tenantId, userId, created.get("id").toString());
+    }
+
+    private Map<String, Object> buildDeviceBundleContent(Device device) {
+        Set<String> groupIds = deviceScopeRepository.findGroupIdsForDevice(device.id());
+        List<Policy> applicable = policyRepository.listPublished(device.tenantId()).stream()
+                .filter(p -> policyScopeMatcher.appliesToDevice(p.scopeJson(), device.orgUnitId(), groupIds))
+                .toList();
+        Map<String, Object> rules = buildRulesMap(applicable);
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("tenant_id", device.tenantId());
+        content.put("device_id", device.id());
+        content.put("generated_at", Instant.now().toString());
+        content.put("rules", rules);
+        return content;
+    }
+
+    private Map<String, Object> buildRulesMap(List<Policy> policies) {
+        Map<String, Object> rules = new LinkedHashMap<>();
+        for (Policy p : policies) {
+            Map<String, Object> content = parseJson(p.contentJson());
+            Map<String, Object> rule = new LinkedHashMap<>();
+            rule.put("policy_id", p.id());
+            rule.put("name", p.name());
+            rule.put("priority", p.priority());
+            rule.put("scope", parseJson(p.scopeJson()));
+            rule.put("config", content);
+            rules.put(p.type(), rule);
+        }
+        return rules;
     }
 
     private Map<String, Object> toView(Policy p) {
@@ -150,6 +187,7 @@ public class PolicyService {
         m.put("type", p.type());
         m.put("status", p.status());
         m.put("priority", p.priority());
+        m.put("scope", parseJson(p.scopeJson()));
         m.put("content", parseJson(p.contentJson()));
         m.put("created_at", p.createdAt().toString());
         m.put("updated_at", p.updatedAt().toString());
@@ -161,6 +199,13 @@ public class PolicyService {
             return Map.of("blacklist", List.of(), "whitelist", List.of(), "action", "alert");
         }
         return Map.of();
+    }
+
+    private Map<String, Object> normalizeScope(Map<String, Object> scope) {
+        if (scope == null || scope.isEmpty()) {
+            return Map.of("mode", "all");
+        }
+        return scope;
     }
 
     private Map<String, Object> parseJson(String json) {

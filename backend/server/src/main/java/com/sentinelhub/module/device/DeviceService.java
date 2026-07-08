@@ -155,6 +155,7 @@ public class DeviceService {
         Map<String, Object> m = new HashMap<>();
         m.put("id", d.id());
         m.put("agent_id", d.agentId());
+        m.put("org_unit_id", d.orgUnitId());
         m.put("hostname", d.hostname());
         m.put("os_type", d.osType());
         m.put("os_version", d.osVersion());

@@ -61,11 +61,13 @@ public class PolicyRepository {
         return findById(tenantId, id).orElseThrow();
     }
 
-    public void updateDraft(String tenantId, String id, String name, String contentJson, int priority) {
+    public void updateDraft(String tenantId, String id, String name, String contentJson,
+                            String scopeJson, int priority) {
         jdbc.update(
-                "UPDATE policies SET name = ?, content = CAST(? AS JSON), priority = ?, updated_at = CURRENT_TIMESTAMP(3) "
+                "UPDATE policies SET name = ?, content = CAST(? AS JSON), scope = CAST(? AS JSON), "
+                        + "priority = ?, updated_at = CURRENT_TIMESTAMP(3) "
                         + "WHERE tenant_id = ? AND id = ? AND status = 'draft'",
-                name, contentJson, priority, tenantId, id);
+                name, contentJson, scopeJson, priority, tenantId, id);
     }
 
     public void markPublished(String tenantId, String id) {

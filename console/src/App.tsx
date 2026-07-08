@@ -5,6 +5,7 @@ import Devices from './pages/devices';
 import Audit from './pages/audit';
 import Login from './pages/login';
 import Policies from './pages/policies';
+import DeviceGroups from './pages/device-groups';
 import Events from './pages/events';
 import Compliance from './pages/compliance';
 import { getToken, clearToken } from './api/client';
@@ -16,6 +17,7 @@ const menuItems = [
   { key: '/devices', label: <Link to="/devices">设备管控</Link> },
   { key: '/assets', label: <Link to="/assets">资产管理</Link> },
   { key: '/policies', label: <Link to="/policies">策略管理</Link> },
+  { key: '/device-groups', label: <Link to="/device-groups">设备组</Link> },
   { key: '/events', label: <Link to="/events">安全事件</Link> },
   { key: '/compliance', label: <Link to="/compliance">合规检查</Link> },
   { key: '/dlp', label: <Link to="/dlp">DLP</Link> },
@@ -58,6 +60,7 @@ function AppLayout() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/devices" element={<Devices />} />
             <Route path="/policies" element={<Policies />} />
+            <Route path="/device-groups" element={<DeviceGroups />} />
             <Route path="/events" element={<Events />} />
             <Route path="/compliance" element={<Compliance />} />
             <Route path="/audit" element={<Audit />} />

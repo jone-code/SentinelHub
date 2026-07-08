@@ -8,14 +8,29 @@ interface PolicyRow {
   type: string;
   status: string;
   priority: number;
+  scope?: { mode?: string; ids?: string[] };
   updated_at: string;
 }
+
+interface ScopeOption {
+  id: string;
+  name: string;
+}
+
+const scopeModeLabels: Record<string, string> = {
+  all: '全部设备',
+  org_unit: '组织单元',
+  device_group: '设备组',
+};
 
 export default function Policies() {
   const [data, setData] = useState<PolicyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [orgUnits, setOrgUnits] = useState<ScopeOption[]>([]);
+  const [deviceGroups, setDeviceGroups] = useState<ScopeOption[]>([]);
   const [form] = Form.useForm();
+  const scopeMode = Form.useWatch('scope_mode', form);
 
   const load = () => {
     setLoading(true);
@@ -25,7 +40,20 @@ export default function Policies() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  const loadScopeOptions = () => {
+    Promise.all([
+      api.get<ApiEnvelope<ScopeOption[]>>('/org-units'),
+      api.get<ApiEnvelope<ScopeOption[]>>('/device-groups'),
+    ]).then(([orgRes, groupRes]) => {
+      setOrgUnits(orgRes.data.data);
+      setDeviceGroups(groupRes.data.data);
+    }).catch(() => {});
+  };
+
+  useEffect(() => {
+    load();
+    loadScopeOptions();
+  }, []);
 
   const publish = async (id: string) => {
     try {
@@ -46,12 +74,16 @@ export default function Policies() {
       message.error('策略内容必须是合法 JSON');
       return;
     }
+    const scope = values.scope_mode === 'all'
+      ? { mode: 'all' }
+      : { mode: values.scope_mode, ids: values.scope_ids ?? [] };
     try {
       await api.post('/policies', {
         name: values.name,
         type: values.type,
         priority: values.priority,
         content,
+        scope,
       });
       message.success('策略已创建（草稿）');
       setModalOpen(false);
@@ -62,9 +94,25 @@ export default function Policies() {
     }
   };
 
+  const renderScope = (scope?: PolicyRow['scope']) => {
+    const mode = scope?.mode ?? 'all';
+    const label = scopeModeLabels[mode] ?? mode;
+    const count = scope?.ids?.length ?? 0;
+    if (mode === 'all' || count === 0) {
+      return <Tag>{label}</Tag>;
+    }
+    return <Tag color="blue">{label} ({count})</Tag>;
+  };
+
   const columns = [
     { title: '名称', dataIndex: 'name', key: 'name' },
     { title: '类型', dataIndex: 'type', key: 'type' },
+    {
+      title: '作用域',
+      dataIndex: 'scope',
+      key: 'scope',
+      render: (scope: PolicyRow['scope']) => renderScope(scope),
+    },
     {
       title: '状态',
       dataIndex: 'status',
@@ -88,6 +136,8 @@ export default function Policies() {
     },
   ];
 
+  const scopeOptions = scopeMode === 'org_unit' ? orgUnits : deviceGroups;
+
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
@@ -105,6 +155,7 @@ export default function Policies() {
         <Form form={form} layout="vertical" initialValues={{
           type: 'software',
           priority: 100,
+          scope_mode: 'all',
           content_json: JSON.stringify({
             blacklist: ['utorrent.exe'],
             whitelist: [],
@@ -123,6 +174,22 @@ export default function Policies() {
           <Form.Item name="priority" label="优先级">
             <Input type="number" />
           </Form.Item>
+          <Form.Item name="scope_mode" label="作用域">
+            <Select options={[
+              { value: 'all', label: '全部设备' },
+              { value: 'org_unit', label: '组织单元' },
+              { value: 'device_group', label: '设备组' },
+            ]} />
+          </Form.Item>
+          {scopeMode && scopeMode !== 'all' && (
+            <Form.Item name="scope_ids" label="目标" rules={[{ required: true, message: '请选择作用域目标' }]}>
+              <Select
+                mode="multiple"
+                options={scopeOptions.map((o) => ({ value: o.id, label: o.name }))}
+                placeholder="选择组织或设备组"
+              />
+            </Form.Item>
+          )}
           <Form.Item name="content_json" label="策略内容 (JSON)" rules={[{ required: true }]}>
             <Input.TextArea rows={10} />
           </Form.Item>

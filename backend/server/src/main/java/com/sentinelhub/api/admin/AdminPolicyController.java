@@ -42,7 +42,7 @@ public class AdminPolicyController {
         TenantContext ctx = requireContext();
         return ApiResponse.ok(policyService.createPolicy(
                 ctx.tenantId(), ctx.userId(), request.name(), request.type(),
-                request.content(), request.resolvedPriority()));
+                request.content(), request.scope(), request.resolvedPriority()));
     }
 
     @PutMapping("/{id}")
@@ -51,7 +51,7 @@ public class AdminPolicyController {
         TenantContext ctx = requireContext();
         return ApiResponse.ok(policyService.updatePolicy(
                 ctx.tenantId(), ctx.userId(), id, request.name(),
-                request.content(), request.resolvedPriority()));
+                request.content(), request.scope(), request.resolvedPriority()));
     }
 
     @PostMapping("/{id}/publish")

@@ -282,7 +282,11 @@ export class ClientService {
         if (this.reportedViolations.has(key)) continue;
         this.reportedViolations.add(key);
         newEvents.push(...violationsToEvents([v]));
-        console.warn(`[sentinel-service] software violation: ${v.process} (rule: ${v.matched_rule})`);
+        if (v.blocked) {
+          console.warn(`[sentinel-service] blocked process: ${v.process} pids=${(v.terminated_pids ?? []).join(',')}`);
+        } else {
+          console.warn(`[sentinel-service] software violation: ${v.process} (rule: ${v.matched_rule})`);
+        }
       }
       if (newEvents.length > 0) {
         await this.reportEvents(newEvents);
