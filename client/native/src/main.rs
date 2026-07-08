@@ -70,6 +70,49 @@ fn main() {
         return;
     }
 
+    if args.len() >= 4 && args[1] == "enforce" && args[2] == "dlp" {
+        let rules_path = parse_flag_path(&args, "--rules-file")
+            .unwrap_or_else(|| {
+                eprintln!("--rules-file required");
+                std::process::exit(2);
+            });
+        let json_flag = args.iter().any(|a| a == "--json");
+        match enforce::dlp::run(&rules_path) {
+            Ok(result) => {
+                if json_flag {
+                    println!("{}", serde_json::to_string(&result).unwrap_or_else(|_| "{}".into()));
+                }
+            }
+            Err(err) => {
+                eprintln!("{err}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    if args.len() >= 4 && args[1] == "enforce" && args[2] == "nac" {
+        let policy_path = parse_flag_path(&args, "--policy-file")
+            .unwrap_or_else(|| {
+                eprintln!("--policy-file required");
+                std::process::exit(2);
+            });
+        let score = parse_flag_i32(&args, "--compliance-score").unwrap_or(0);
+        let json_flag = args.iter().any(|a| a == "--json");
+        match enforce::nac::run(&policy_path, score) {
+            Ok(result) => {
+                if json_flag {
+                    println!("{}", serde_json::to_string(&result).unwrap_or_else(|_| "{}".into()));
+                }
+            }
+            Err(err) => {
+                eprintln!("{err}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
     if args.len() >= 3 && args[1] == "scan" && args[2] == "compliance" {
         let json_flag = args.iter().any(|a| a == "--json");
         let rules_path = parse_flag_path(&args, "--rules-file");
@@ -90,6 +133,8 @@ fn main() {
     eprintln!("usage:");
     eprintln!("  sentinel-native collect --json");
     eprintln!("  sentinel-native enforce software --policy-file <path> --json");
+    eprintln!("  sentinel-native enforce dlp --rules-file <path> --json");
+    eprintln!("  sentinel-native enforce nac --policy-file <path> --compliance-score <n> --json");
     eprintln!("  sentinel-native scan compliance [--rules-file <path>] --json");
     std::process::exit(2);
 }
@@ -99,6 +144,13 @@ fn parse_flag_path(args: &[String], flag: &str) -> Option<PathBuf> {
         .position(|a| a == flag)
         .and_then(|i| args.get(i + 1))
         .map(PathBuf::from)
+}
+
+fn parse_flag_i32(args: &[String], flag: &str) -> Option<i32> {
+    args.iter()
+        .position(|a| a == flag)
+        .and_then(|i| args.get(i + 1))
+        .and_then(|v| v.parse().ok())
 }
 
 fn collect_assets() -> Result<String, String> {

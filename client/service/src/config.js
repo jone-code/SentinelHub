@@ -16,5 +16,7 @@ export function loadConfig() {
     assetCollectIntervalMs: parseInt(process.env.CLIENT_ASSET_INTERVAL_SEC || '300', 10) * 1000,
     enforceIntervalMs: parseInt(process.env.CLIENT_ENFORCE_INTERVAL_SEC || '60', 10) * 1000,
     complianceIntervalMs: parseInt(process.env.CLIENT_COMPLIANCE_INTERVAL_SEC || '300', 10) * 1000,
+    dlpIntervalMs: parseInt(process.env.CLIENT_DLP_INTERVAL_SEC || '120', 10) * 1000,
+    nacIntervalMs: parseInt(process.env.CLIENT_NAC_INTERVAL_SEC || '120', 10) * 1000,
   };
 }

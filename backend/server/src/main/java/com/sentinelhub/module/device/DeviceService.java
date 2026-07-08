@@ -4,6 +4,8 @@ import com.sentinelhub.module.audit.AuditService;
 import com.sentinelhub.module.device.domain.Device;
 import com.sentinelhub.module.policy.PolicyService;
 import com.sentinelhub.module.compliance.ComplianceService;
+import com.sentinelhub.module.dlp.DlpService;
+import com.sentinelhub.module.nac.NacService;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -22,13 +24,18 @@ public class DeviceService {
     private final AuditService auditService;
     private final PolicyService policyService;
     private final ComplianceService complianceService;
+    private final DlpService dlpService;
+    private final NacService nacService;
 
     public DeviceService(DeviceRepository deviceRepository, AuditService auditService,
-                         PolicyService policyService, ComplianceService complianceService) {
+                         PolicyService policyService, ComplianceService complianceService,
+                         DlpService dlpService, NacService nacService) {
         this.deviceRepository = deviceRepository;
         this.auditService = auditService;
         this.policyService = policyService;
         this.complianceService = complianceService;
+        this.dlpService = dlpService;
+        this.nacService = nacService;
     }
 
     public Map<String, Object> register(String tenantId, String tenantToken, Map<String, Object> body) {
@@ -81,6 +88,16 @@ public class DeviceService {
         if (!complianceBaseline.isEmpty()) {
             response.put("compliance_baseline", complianceBaseline);
         }
+        deviceRepository.findByAgentIdAny(clientId).ifPresent(device -> {
+            Map<String, Object> dlpRules = dlpService.getRulesSummaryForClient(device.tenantId());
+            if (!dlpRules.isEmpty()) {
+                response.put("dlp_rules", dlpRules);
+            }
+            Map<String, Object> nacPolicy = nacService.getPolicySummaryForClient(device.tenantId());
+            if (!nacPolicy.isEmpty()) {
+                response.put("nac_policy", nacPolicy);
+            }
+        });
         return response;
     }
 

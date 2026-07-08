@@ -8,6 +8,8 @@ import Policies from './pages/policies';
 import DeviceGroups from './pages/device-groups';
 import Events from './pages/events';
 import Compliance from './pages/compliance';
+import Dlp from './pages/dlp';
+import Nac from './pages/nac';
 import { getToken, clearToken } from './api/client';
 
 const { Header, Sider, Content } = Layout;
@@ -21,6 +23,7 @@ const menuItems = [
   { key: '/events', label: <Link to="/events">安全事件</Link> },
   { key: '/compliance', label: <Link to="/compliance">合规检查</Link> },
   { key: '/dlp', label: <Link to="/dlp">DLP</Link> },
+  { key: '/nac', label: <Link to="/nac">网络准入</Link> },
   { key: '/audit', label: <Link to="/audit">审计日志</Link> },
 ];
 
@@ -63,6 +66,8 @@ function AppLayout() {
             <Route path="/device-groups" element={<DeviceGroups />} />
             <Route path="/events" element={<Events />} />
             <Route path="/compliance" element={<Compliance />} />
+            <Route path="/dlp" element={<Dlp />} />
+            <Route path="/nac" element={<Nac />} />
             <Route path="/audit" element={<Audit />} />
             <Route path="*" element={<Placeholder title="模块开发中" />} />
           </Routes>

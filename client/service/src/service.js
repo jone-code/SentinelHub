@@ -4,7 +4,11 @@ import { LocalServer } from './local-server.js';
 import { loadClientState, saveClientState } from './state.js';
 import { loadPolicyState, syncPolicy } from './policy.js';
 import { loadBaselineState, syncBaseline } from './compliance-baseline.js';
+import { loadDlpState, syncDlpRules } from './dlp-policy.js';
+import { loadNacState, syncNacPolicy } from './nac-policy.js';
 import { enforceSoftware, violationsToEvents } from './enforcers/software.js';
+import { enforceDlp, dlpViolationsToEvents } from './enforcers/dlp.js';
+import { evaluateNac } from './enforcers/nac.js';
 import { scanCompliance } from './collectors/compliance.js';
 
 /**
@@ -19,6 +23,8 @@ export class ClientService {
     this.assetTimer = null;
     this.enforceTimer = null;
     this.complianceTimer = null;
+    this.dlpTimer = null;
+    this.nacTimer = null;
     this.running = false;
     /** @type {LocalServer | null} */
     this.localServer = null;
@@ -39,8 +45,18 @@ export class ClientService {
     this.policy = null;
     /** @type {object | null} */
     this.complianceBaseline = null;
+    /** @type {object | null} */
+    this.dlpRules = null;
+    /** @type {object | null} */
+    this.nacPolicy = null;
+    /** @type {object | null} */
+    this.nacStatus = null;
+    /** @type {number} */
+    this.lastComplianceScore = 0;
     /** @type {Set<string>} */
     this.reportedViolations = new Set();
+    /** @type {Set<string>} */
+    this.reportedDlpViolations = new Set();
   }
 
   getLocalStatus() {
@@ -68,6 +84,14 @@ export class ClientService {
       compliance_baseline: {
         id: this.complianceBaseline?.id ?? null,
         hash: this.complianceBaseline?.hash ?? null,
+      },
+      dlp: {
+        rule_count: this.dlpRules?.rules?.length ?? 0,
+        hash: this.dlpRules?.hash ?? null,
+      },
+      nac: {
+        access_state: this.nacStatus?.access_state ?? null,
+        compliance_score: this.lastComplianceScore,
       },
       started_at: this.state.startedAt,
     };
@@ -100,6 +124,8 @@ export class ClientService {
 
     this.policy = await loadPolicyState();
     this.complianceBaseline = await loadBaselineState();
+    this.dlpRules = await loadDlpState();
+    this.nacPolicy = await loadNacState();
 
     const saved = await loadClientState();
     if (saved.client_id) {
@@ -120,11 +146,15 @@ export class ClientService {
     await this.heartbeat();
     await this.runEnforcement();
     await this.runComplianceScan();
+    await this.runDlpEnforcement();
+    await this.runNacEvaluation();
 
     this.heartbeatTimer = setInterval(() => this.heartbeat(), this.config.heartbeatIntervalMs);
     this.assetTimer = setInterval(() => this.collectAndReportAssets(), this.config.assetCollectIntervalMs);
     this.enforceTimer = setInterval(() => this.runEnforcement(), this.config.enforceIntervalMs);
     this.complianceTimer = setInterval(() => this.runComplianceScan(), this.config.complianceIntervalMs);
+    this.dlpTimer = setInterval(() => this.runDlpEnforcement(), this.config.dlpIntervalMs);
+    this.nacTimer = setInterval(() => this.runNacEvaluation(), this.config.nacIntervalMs);
   }
 
   async stop() {
@@ -144,6 +174,14 @@ export class ClientService {
     if (this.complianceTimer) {
       clearInterval(this.complianceTimer);
       this.complianceTimer = null;
+    }
+    if (this.dlpTimer) {
+      clearInterval(this.dlpTimer);
+      this.dlpTimer = null;
+    }
+    if (this.nacTimer) {
+      clearInterval(this.nacTimer);
+      this.nacTimer = null;
     }
     if (this.localServer) {
       await this.localServer.stop();
@@ -208,6 +246,16 @@ export class ClientService {
         this.complianceBaseline = await syncBaseline(this.config, this.state.clientId, baselineSummary);
         await this.runComplianceScan();
       }
+      const dlpSummary = body?.data?.dlp_rules;
+      if (dlpSummary && this.state.clientId) {
+        this.dlpRules = await syncDlpRules(this.config, this.state.clientId, dlpSummary);
+        await this.runDlpEnforcement();
+      }
+      const nacSummary = body?.data?.nac_policy;
+      if (nacSummary && this.state.clientId) {
+        this.nacPolicy = await syncNacPolicy(this.config, this.state.clientId, nacSummary);
+        await this.runNacEvaluation();
+      }
       await this.runEnforcement();
       console.log('[sentinel-service] heartbeat ok', body?.data?.server_time ?? res.status);
     } catch (err) {
@@ -237,8 +285,10 @@ export class ClientService {
     if (!this.state.clientId) return;
     try {
       const report = await scanCompliance(this.nativeBin, this.complianceBaseline);
+      this.lastComplianceScore = report.score ?? 0;
       console.log(`[sentinel-service] compliance scan score=${report.score} passed=${report.passed} failed=${report.failed}`);
       await this.reportCompliance(report);
+      await this.runNacEvaluation();
     } catch (err) {
       console.error('[sentinel-service] compliance scan failed:', err.message);
     }
@@ -306,6 +356,57 @@ export class ClientService {
       }
     } catch (err) {
       console.error('[sentinel-service] enforcement failed:', err.message);
+    }
+  }
+
+  async runDlpEnforcement() {
+    if (!this.dlpRules || !this.state.clientId) return;
+    try {
+      const result = await enforceDlp(this.nativeBin, this.dlpRules);
+      const newEvents = [];
+      for (const v of result.violations ?? []) {
+        const key = `${v.rule_id}:${v.detail}`;
+        if (this.reportedDlpViolations.has(key)) continue;
+        this.reportedDlpViolations.add(key);
+        newEvents.push(...dlpViolationsToEvents([v]));
+        console.warn(`[sentinel-service] DLP violation: ${v.rule_name} (${v.channel})`);
+      }
+      if (newEvents.length > 0) {
+        await this.reportEvents(newEvents);
+      }
+    } catch (err) {
+      console.error('[sentinel-service] DLP enforcement failed:', err.message);
+    }
+  }
+
+  async runNacEvaluation() {
+    if (!this.nacPolicy || !this.state.clientId) return;
+    try {
+      const result = await evaluateNac(this.nativeBin, this.nacPolicy, this.lastComplianceScore);
+      this.nacStatus = result;
+      console.log(`[sentinel-service] NAC access=${result.access_state} score=${result.compliance_score}`);
+      await this.reportNacStatus(result);
+    } catch (err) {
+      console.error('[sentinel-service] NAC evaluation failed:', err.message);
+    }
+  }
+
+  async reportNacStatus(status) {
+    const url = `${this.config.serverUrl}/api/client/v1/service/report/nac-status`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: this.state.clientId,
+          status,
+        }),
+      });
+      if (!res.ok) {
+        console.warn('[sentinel-service] nac status report', res.status);
+      }
+    } catch (err) {
+      console.error('[sentinel-service] nac status report failed:', err.message);
     }
   }
 

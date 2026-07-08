@@ -21,10 +21,14 @@
 | `module.policy` | P1 | **CRUD/发布/策略包下发/作用域** |
 | `module.software` | P1 | **黑名单检测/阻断/事件上报** |
 | `module.compliance` | P1 | **基线扫描/评分/可配置基线** |
-| 其他模块 | P1~P4 | 骨架 |
+| `module.dlp` | P2 | **DLP 规则/USB 管控/事件** |
+| `module.nac` | P2 | **准入策略/合规联动/状态上报** |
+| 其他模块 | P3~P4 | 骨架 |
 
-## 下一步（P2）
+## 下一步（P2 继续）
 
-1. ~~合规基线可配置（控制台编辑）~~ ✅
-2. `module.dlp`、`module.nac` 骨架与 API
-3. Rust 驱动级强制能力
+1. ~~DLP 规则引擎 + USB 检测/阻断~~ ✅
+2. ~~NAC 准入策略 + 合规分联动~~ ✅
+3. DLP 取证（MinIO 存储）
+4. RADIUS 集成模板
+5. Rust 驱动级强制（`native/driver/`）
