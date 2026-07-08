@@ -1,0 +1,8 @@
+# Example device entries — map to VLAN via reply attributes in production
+DEFAULT Auth-Type := Accept
+    Reply-Message := "SentinelHub NAC template"
+
+sentinel-test Cleartext-Password := "test"
+    Tunnel-Type := VLAN,
+    Tunnel-Medium-Type := IEEE-802,
+    Tunnel-Private-Group-Id := "100"

@@ -5,6 +5,7 @@
 
 mod enforce;
 mod scan;
+mod driver;
 
 use serde::Serialize;
 use std::env;
@@ -113,6 +114,15 @@ fn main() {
         return;
     }
 
+    if args.len() >= 3 && args[1] == "driver" && args[2] == "status" {
+        let json_flag = args.iter().any(|a| a == "--json");
+        let result = driver::status();
+        if json_flag {
+            println!("{}", serde_json::to_string(&result).unwrap_or_else(|_| "{}".into()));
+        }
+        return;
+    }
+
     if args.len() >= 3 && args[1] == "scan" && args[2] == "compliance" {
         let json_flag = args.iter().any(|a| a == "--json");
         let rules_path = parse_flag_path(&args, "--rules-file");
@@ -135,6 +145,7 @@ fn main() {
     eprintln!("  sentinel-native enforce software --policy-file <path> --json");
     eprintln!("  sentinel-native enforce dlp --rules-file <path> --json");
     eprintln!("  sentinel-native enforce nac --policy-file <path> --compliance-score <n> --json");
+    eprintln!("  sentinel-native driver status --json");
     eprintln!("  sentinel-native scan compliance [--rules-file <path>] --json");
     std::process::exit(2);
 }

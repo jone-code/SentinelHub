@@ -10,16 +10,16 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Component
-@Order(26)
-public class NacSeedRunner implements ApplicationRunner {
+@Order(27)
+public class RadiusSeedRunner implements ApplicationRunner {
 
-    private static final Logger log = LoggerFactory.getLogger(NacSeedRunner.class);
+    private static final Logger log = LoggerFactory.getLogger(RadiusSeedRunner.class);
 
     private final SeedProperties seedProperties;
     private final UserRepository userRepository;
     private final NacService nacService;
 
-    public NacSeedRunner(SeedProperties seedProperties, UserRepository userRepository, NacService nacService) {
+    public RadiusSeedRunner(SeedProperties seedProperties, UserRepository userRepository, NacService nacService) {
         this.seedProperties = seedProperties;
         this.userRepository = userRepository;
         this.nacService = nacService;
@@ -31,9 +31,8 @@ public class NacSeedRunner implements ApplicationRunner {
             return;
         }
         userRepository.findTenantIdBySlug(seedProperties.tenantSlug()).ifPresent(tenantId -> {
-            nacService.seedDemoPolicy(tenantId);
             nacService.seedRadiusTemplate(tenantId);
-            log.info("Ensured demo NAC policy for tenant {}", seedProperties.tenantSlug());
+            log.info("Ensured NAC RADIUS template for tenant {}", seedProperties.tenantSlug());
         });
     }
 }

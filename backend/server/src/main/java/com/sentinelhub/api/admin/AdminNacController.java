@@ -1,6 +1,7 @@
 package com.sentinelhub.api.admin;
 
 import com.sentinelhub.api.admin.dto.UpdateNacPolicyRequest;
+import com.sentinelhub.api.admin.dto.UpdateNacRadiusRequest;
 import com.sentinelhub.common.dto.ApiResponse;
 import com.sentinelhub.common.dto.PageResponse;
 import com.sentinelhub.common.tenant.TenantContext;
@@ -46,6 +47,21 @@ public class AdminNacController {
         String tenantId = requireTenant();
         List<Map<String, Object>> items = nacService.listDeviceStatusForAdmin(tenantId, page, pageSize);
         return ApiResponse.ok(new PageResponse<>(items, nacService.countDeviceStatus(tenantId), page, pageSize));
+    }
+
+    @GetMapping("/radius")
+    public ApiResponse<Map<String, Object>> getRadius() {
+        return ApiResponse.ok(nacService.getRadiusForAdmin(requireTenant()));
+    }
+
+    @PutMapping("/radius")
+    public ApiResponse<Map<String, Object>> updateRadius(@Valid @RequestBody UpdateNacRadiusRequest request) {
+        TenantContext ctx = requireContext();
+        return ApiResponse.ok(nacService.updateRadius(
+                ctx.tenantId(), ctx.userId(), request.resolvedEnabled(),
+                request.serverHost() != null ? request.serverHost() : "radius.example.local",
+                request.resolvedAuthPort(), request.resolvedAcctPort(), request.secret(),
+                request.nasIdentifier(), request.vlanAllowed(), request.vlanRestricted(), request.vlanDenied()));
     }
 
     private static String requireTenant() {

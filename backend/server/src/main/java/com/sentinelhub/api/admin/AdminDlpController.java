@@ -60,6 +60,20 @@ public class AdminDlpController {
         return ApiResponse.ok(new PageResponse<>(items, dlpService.countEvents(tenantId), page, pageSize));
     }
 
+    @GetMapping("/evidence")
+    public ApiResponse<PageResponse<Map<String, Object>>> listEvidence(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(name = "page_size", defaultValue = "20") int pageSize) {
+        String tenantId = requireTenant();
+        List<Map<String, Object>> items = dlpService.listEvidenceForAdmin(tenantId, page, pageSize);
+        return ApiResponse.ok(new PageResponse<>(items, dlpService.countEvidence(tenantId), page, pageSize));
+    }
+
+    @GetMapping("/evidence/{id}/download")
+    public ApiResponse<Map<String, Object>> evidenceDownload(@PathVariable String id) {
+        return ApiResponse.ok(dlpService.getEvidenceDownloadUrl(requireTenant(), id));
+    }
+
     private static String requireTenant() {
         return requireContext().tenantId();
     }

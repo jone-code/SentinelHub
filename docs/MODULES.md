@@ -21,14 +21,14 @@
 | `module.policy` | P1 | **CRUD/发布/策略包下发/作用域** |
 | `module.software` | P1 | **黑名单检测/阻断/事件上报** |
 | `module.compliance` | P1 | **基线扫描/评分/可配置基线** |
-| `module.dlp` | P2 | **DLP 规则/USB 管控/事件** |
-| `module.nac` | P2 | **准入策略/合规联动/状态上报** |
+| `module.dlp` | P2 | **规则/USB 管控/MinIO 取证** |
+| `module.nac` | P2 | **准入策略/合规联动/RADIUS 模板** |
 | 其他模块 | P3~P4 | 骨架 |
 
-## 下一步（P2 继续）
+## 下一步（P3）
 
-1. ~~DLP 规则引擎 + USB 检测/阻断~~ ✅
-2. ~~NAC 准入策略 + 合规分联动~~ ✅
-3. DLP 取证（MinIO 存储）
-4. RADIUS 集成模板
-5. Rust 驱动级强制（`native/driver/`）
+1. `module.zerotrust` — 信任分与动态策略
+2. `module.mdm` — 移动端基础纳管
+3. `module.remote` — 远程协助
+4. Rust 驱动实装（`native/driver/`）
+5. 控制台资产管理页

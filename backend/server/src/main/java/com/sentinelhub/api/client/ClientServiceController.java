@@ -103,6 +103,28 @@ public class ClientServiceController {
         return ApiResponse.ok(nacService.getPolicyForClient(device.tenantId()));
     }
 
+    @GetMapping("/nac-radius")
+    public ApiResponse<Map<String, Object>> nacRadius(@RequestParam("client_id") String clientId) {
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        return ApiResponse.ok(nacService.getRadiusForClient(device.tenantId()));
+    }
+
+    @PostMapping("/report/dlp-evidence")
+    public ApiResponse<Map<String, Object>> reportDlpEvidence(@RequestBody Map<String, Object> body) {
+        String clientId = stringVal(body.get("client_id"));
+        if (clientId == null || clientId.isBlank()) {
+            throw new IllegalArgumentException("client_id required");
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> evidence = body.get("evidence") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m : body;
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        return ApiResponse.ok(dlpService.ingestEvidence(
+                device.tenantId(), device.deviceId(), clientId, evidence));
+    }
+
     @PostMapping("/report/nac-status")
     public ApiResponse<Map<String, Object>> reportNacStatus(@RequestBody Map<String, Object> body) {
         String clientId = stringVal(body.get("client_id"));

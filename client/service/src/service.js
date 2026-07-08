@@ -374,8 +374,39 @@ export class ClientService {
       if (newEvents.length > 0) {
         await this.reportEvents(newEvents);
       }
+      await this.reportDlpEvidence(result.violations ?? []);
     } catch (err) {
       console.error('[sentinel-service] DLP enforcement failed:', err.message);
+    }
+  }
+
+  async reportDlpEvidence(violations) {
+    if (!violations.length || !this.state.clientId) return;
+    const url = `${this.config.serverUrl}/api/client/v1/service/report/dlp-evidence`;
+    for (const v of violations) {
+      for (const file of v.evidence_files ?? []) {
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_id: this.state.clientId,
+              evidence: {
+                rule_id: v.rule_id,
+                channel: v.channel,
+                filename: file.filename,
+                content_base64: file.content_base64,
+                sha256: file.sha256,
+              },
+            }),
+          });
+          if (res.ok) {
+            console.log(`[sentinel-service] DLP evidence uploaded: ${file.filename}`);
+          }
+        } catch (err) {
+          console.error('[sentinel-service] DLP evidence upload failed:', err.message);
+        }
+      }
     }
   }
 

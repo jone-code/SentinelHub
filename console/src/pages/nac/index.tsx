@@ -2,6 +2,19 @@ import { Button, Card, Col, Form, Input, InputNumber, Row, Select, Switch, Table
 import { useEffect, useState } from 'react';
 import { api, ApiEnvelope, PageData } from '../../api/client';
 
+interface NacRadius {
+  enabled: boolean;
+  server_host: string;
+  auth_port: number;
+  acct_port: number;
+  secret_masked?: string;
+  nas_identifier?: string;
+  vlan_allowed?: string;
+  vlan_restricted?: string;
+  vlan_denied?: string;
+  updated_at?: string;
+}
+
 interface NacPolicy {
   id: string;
   name: string;
@@ -33,15 +46,18 @@ export default function Nac() {
   const [devices, setDevices] = useState<DeviceStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [radiusSaving, setRadiusSaving] = useState(false);
   const [form] = Form.useForm();
+  const [radiusForm] = Form.useForm();
 
   const load = () => {
     setLoading(true);
     Promise.all([
       api.get<ApiEnvelope<NacPolicy>>('/nac/policy'),
       api.get<ApiEnvelope<PageData<DeviceStatus>>>('/nac/devices'),
+      api.get<ApiEnvelope<NacRadius>>('/nac/radius'),
     ])
-      .then(([policyRes, devicesRes]) => {
+      .then(([policyRes, devicesRes, radiusRes]) => {
         const p = policyRes.data.data;
         if (p?.id) {
           setPolicy(p);
@@ -54,6 +70,19 @@ export default function Nac() {
           });
         }
         setDevices(devicesRes.data.data.items);
+        const r = radiusRes.data.data;
+        if (r?.server_host) {
+          radiusForm.setFieldsValue({
+            enabled: r.enabled,
+            server_host: r.server_host,
+            auth_port: r.auth_port,
+            acct_port: r.acct_port,
+            nas_identifier: r.nas_identifier,
+            vlan_allowed: r.vlan_allowed,
+            vlan_restricted: r.vlan_restricted,
+            vlan_denied: r.vlan_denied,
+          });
+        }
       })
       .catch(() => message.error('加载 NAC 数据失败'))
       .finally(() => setLoading(false));
@@ -72,6 +101,20 @@ export default function Nac() {
       message.error('保存失败');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveRadius = async () => {
+    const values = await radiusForm.validateFields();
+    setRadiusSaving(true);
+    try {
+      await api.put('/nac/radius', values);
+      message.success('RADIUS 配置已保存');
+      load();
+    } catch {
+      message.error('保存失败');
+    } finally {
+      setRadiusSaving(false);
     }
   };
 
@@ -156,6 +199,51 @@ export default function Nac() {
         ) : (
           <div style={{ color: '#888' }}>暂无准入策略，请检查种子数据是否已初始化</div>
         )}
+      </Card>
+
+      <Card title="RADIUS 集成（测试环境模板）" style={{ marginBottom: 24 }}>
+        <Form form={radiusForm} layout="vertical">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="server_host" label="RADIUS 服务器">
+                <Input placeholder="radius.example.local" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="auth_port" label="认证端口">
+                <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="acct_port" label="计费端口">
+                <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item name="secret" label="共享密钥（留空则不修改）">
+                <Input.Password placeholder="changeme" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="nas_identifier" label="NAS 标识">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="enabled" label="启用 RADIUS" valuePropName="checked">
+                <Switch />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={8}><Form.Item name="vlan_allowed" label="允许 VLAN"><Input /></Form.Item></Col>
+            <Col span={8}><Form.Item name="vlan_restricted" label="限制 VLAN"><Input /></Form.Item></Col>
+            <Col span={8}><Form.Item name="vlan_denied" label="拒绝 VLAN"><Input /></Form.Item></Col>
+          </Row>
+          <Button type="primary" loading={radiusSaving} onClick={saveRadius}>保存 RADIUS</Button>
+        </Form>
       </Card>
 
       <Card title="设备准入状态">

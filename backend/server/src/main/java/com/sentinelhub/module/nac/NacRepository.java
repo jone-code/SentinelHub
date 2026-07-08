@@ -84,4 +84,34 @@ public class NacRepository {
                 "SELECT COUNT(*) FROM nac_device_status WHERE tenant_id = ?", Integer.class, tenantId);
         return c != null ? c : 0;
     }
+
+    public void upsertRadiusSettings(String tenantId, boolean enabled, String serverHost, int authPort, int acctPort,
+                                     String secret, String nasIdentifier, String vlanAllowed,
+                                     String vlanRestricted, String vlanDenied) {
+        jdbc.update(
+                "INSERT INTO nac_radius_settings (tenant_id, enabled, server_host, auth_port, acct_port, secret, "
+                        + "nas_identifier, vlan_allowed, vlan_restricted, vlan_denied) VALUES (?,?,?,?,?,?,?,?,?,?) "
+                        + "ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), server_host = VALUES(server_host), "
+                        + "auth_port = VALUES(auth_port), acct_port = VALUES(acct_port), secret = VALUES(secret), "
+                        + "nas_identifier = VALUES(nas_identifier), vlan_allowed = VALUES(vlan_allowed), "
+                        + "vlan_restricted = VALUES(vlan_restricted), vlan_denied = VALUES(vlan_denied), "
+                        + "updated_at = CURRENT_TIMESTAMP(3)",
+                tenantId, enabled ? 1 : 0, serverHost, authPort, acctPort, secret, nasIdentifier,
+                vlanAllowed, vlanRestricted, vlanDenied);
+    }
+
+    public Optional<Map<String, Object>> findRadiusSettings(String tenantId) {
+        var list = jdbc.queryForList(
+                "SELECT enabled, server_host, auth_port, acct_port, secret, nas_identifier, "
+                        + "vlan_allowed, vlan_restricted, vlan_denied, updated_at "
+                        + "FROM nac_radius_settings WHERE tenant_id = ?",
+                tenantId);
+        return list.stream().findFirst();
+    }
+
+    public boolean hasRadiusSettings(String tenantId) {
+        Integer c = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM nac_radius_settings WHERE tenant_id = ?", Integer.class, tenantId);
+        return c != null && c > 0;
+    }
 }

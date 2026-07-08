@@ -36,3 +36,10 @@ sentinelhub:
     admin-password: ${SEED_ADMIN_PASSWORD:admin123}
     tenant-slug: ${SEED_TENANT_SLUG:demo}
     registration-token: ${SEED_REGISTRATION_TOKEN:demo-token}
+  minio:
+    enabled: ${MINIO_ENABLED:true}
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:sentinel}
+    secret-key: ${MINIO_SECRET_KEY:sentinel123}
+    bucket: ${MINIO_DLP_BUCKET:sentinel-dlp-evidence}
+    region: ${MINIO_REGION:us-east-1}

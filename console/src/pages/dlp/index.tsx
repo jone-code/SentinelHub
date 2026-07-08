@@ -24,6 +24,16 @@ interface DlpEvent {
   created_at: string;
 }
 
+interface EvidenceRow {
+  id: string;
+  filename: string;
+  size_bytes: number;
+  sha256: string;
+  hostname: string;
+  channel?: string;
+  created_at: string;
+}
+
 const channelOptions = [
   { value: 'usb', label: 'USB 外设' },
   { value: 'sensitive_path', label: '敏感文件路径' },
@@ -32,6 +42,7 @@ const channelOptions = [
 export default function Dlp() {
   const [rules, setRules] = useState<DlpRule[]>([]);
   const [events, setEvents] = useState<DlpEvent[]>([]);
+  const [evidence, setEvidence] = useState<EvidenceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<DlpRule | null>(null);
@@ -42,10 +53,12 @@ export default function Dlp() {
     Promise.all([
       api.get<ApiEnvelope<DlpRule[]>>('/dlp/rules'),
       api.get<ApiEnvelope<PageData<DlpEvent>>>('/dlp/events'),
+      api.get<ApiEnvelope<PageData<EvidenceRow>>>('/dlp/evidence'),
     ])
-      .then(([rulesRes, eventsRes]) => {
+      .then(([rulesRes, eventsRes, evidenceRes]) => {
         setRules(rulesRes.data.data);
         setEvents(eventsRes.data.data.items);
+        setEvidence(evidenceRes.data.data.items);
       })
       .catch(() => message.error('加载 DLP 数据失败'))
       .finally(() => setLoading(false));
@@ -130,6 +143,37 @@ export default function Dlp() {
     },
   ];
 
+  const downloadEvidence = async (id: string) => {
+    try {
+      const res = await api.get<ApiEnvelope<{ download_url?: string; message?: string }>>(
+        `/dlp/evidence/${id}/download`,
+      );
+      const url = res.data.data.download_url;
+      if (url) {
+        window.open(url, '_blank');
+      } else {
+        message.warning(res.data.data.message ?? 'MinIO 未启用，无法下载');
+      }
+    } catch {
+      message.error('获取下载链接失败');
+    }
+  };
+
+  const evidenceColumns = [
+    { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 200 },
+    { title: '主机', dataIndex: 'hostname', key: 'hostname' },
+    { title: '文件名', dataIndex: 'filename', key: 'filename' },
+    { title: '大小', dataIndex: 'size_bytes', key: 'size_bytes', render: (n: number) => `${n} B` },
+    { title: '通道', dataIndex: 'channel', key: 'channel' },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_: unknown, row: EvidenceRow) => (
+        <Button type="link" onClick={() => downloadEvidence(row.id)}>下载</Button>
+      ),
+    },
+  ];
+
   const eventColumns = [
     { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 200 },
     { title: '主机', dataIndex: 'hostname', key: 'hostname' },
@@ -176,6 +220,19 @@ export default function Dlp() {
                 rowKey="id"
                 loading={loading}
                 locale={{ emptyText: '暂无 DLP 事件' }}
+              />
+            ),
+          },
+          {
+            key: 'evidence',
+            label: '取证文件',
+            children: (
+              <Table
+                columns={evidenceColumns}
+                dataSource={evidence}
+                rowKey="id"
+                loading={loading}
+                locale={{ emptyText: '暂无取证文件（敏感文件违规时自动上传至 MinIO）' }}
               />
             ),
           },

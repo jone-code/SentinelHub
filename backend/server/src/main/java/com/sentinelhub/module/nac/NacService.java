@@ -37,6 +37,50 @@ public class NacService {
             return;
         }
         nacRepository.insertPolicy(tenantId, "默认准入策略", 80, "restrict", "quarantine", true);
+        seedRadiusTemplate(tenantId);
+    }
+
+    public void seedRadiusTemplate(String tenantId) {
+        if (nacRepository.hasRadiusSettings(tenantId)) {
+            return;
+        }
+        nacRepository.upsertRadiusSettings(tenantId, false, "radius.example.local", 1812, 1813,
+                "changeme", "sentinel-nas", "vlan-prod", "vlan-quarantine", "vlan-deny");
+    }
+
+    public Map<String, Object> getRadiusForAdmin(String tenantId) {
+        return nacRepository.findRadiusSettings(tenantId)
+                .map(this::toRadiusView)
+                .orElse(Map.of());
+    }
+
+    public Map<String, Object> updateRadius(String tenantId, String userId, boolean enabled, String serverHost,
+                                            int authPort, int acctPort, String secret, String nasIdentifier,
+                                            String vlanAllowed, String vlanRestricted, String vlanDenied) {
+        String existingSecret = nacRepository.findRadiusSettings(tenantId)
+                .map(r -> stringVal(r.get("secret"), ""))
+                .orElse("");
+        String resolvedSecret = (secret == null || secret.isBlank()) ? existingSecret : secret;
+        nacRepository.upsertRadiusSettings(tenantId, enabled, serverHost, authPort, acctPort, resolvedSecret,
+                nasIdentifier, vlanAllowed, vlanRestricted, vlanDenied);
+        auditService.log(tenantId, "user", userId, "nac.radius.update", "nac_radius", tenantId,
+                Map.of("enabled", enabled, "server_host", serverHost), null);
+        return getRadiusForAdmin(tenantId);
+    }
+
+    public Map<String, Object> getRadiusForClient(String tenantId) {
+        return nacRepository.findRadiusSettings(tenantId)
+                .filter(r -> toBool(r.get("enabled")))
+                .map(r -> Map.<String, Object>of(
+                        "server_host", r.get("server_host"),
+                        "auth_port", r.get("auth_port"),
+                        "acct_port", r.get("acct_port"),
+                        "nas_identifier", r.get("nas_identifier"),
+                        "vlan_allowed", r.get("vlan_allowed"),
+                        "vlan_restricted", r.get("vlan_restricted"),
+                        "vlan_denied", r.get("vlan_denied")
+                ))
+                .orElse(Map.of());
     }
 
     public Map<String, Object> getPolicyForAdmin(String tenantId) {
@@ -160,6 +204,27 @@ public class NacService {
         return view;
     }
 
+    private Map<String, Object> toRadiusView(Map<String, Object> row) {
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("enabled", toBool(row.get("enabled")));
+        view.put("server_host", row.get("server_host"));
+        view.put("auth_port", row.get("auth_port"));
+        view.put("acct_port", row.get("acct_port"));
+        view.put("secret_masked", maskSecret(stringVal(row.get("secret"), "")));
+        view.put("nas_identifier", row.get("nas_identifier"));
+        view.put("vlan_allowed", row.get("vlan_allowed"));
+        view.put("vlan_restricted", row.get("vlan_restricted"));
+        view.put("vlan_denied", row.get("vlan_denied"));
+        view.put("updated_at", row.get("updated_at").toString());
+        return view;
+    }
+
+    private static String maskSecret(String secret) {
+        if (secret.isBlank()) return "";
+        if (secret.length() <= 4) return "****";
+        return "****" + secret.substring(secret.length() - 4);
+    }
+
     private Map<String, Object> toStatusView(Map<String, Object> row) {
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("device_id", row.get("device_id"));
@@ -197,6 +262,10 @@ public class NacService {
 
     private static String stringVal(Object value, String fallback) {
         return value != null && !value.toString().isBlank() ? value.toString() : fallback;
+    }
+
+    private static String stringVal(Object value) {
+        return stringVal(value, "");
     }
 
     private static String sha256(String input) {

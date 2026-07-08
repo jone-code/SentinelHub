@@ -20,6 +20,14 @@ pub struct DlpResult {
 }
 
 #[derive(Serialize)]
+pub struct DlpEvidenceFile {
+    pub filename: String,
+    pub sha256: String,
+    pub content_base64: String,
+    pub size_bytes: usize,
+}
+
+#[derive(Serialize)]
 pub struct DlpViolation {
     pub rule_id: String,
     pub rule_name: String,
@@ -27,6 +35,7 @@ pub struct DlpViolation {
     pub action: String,
     pub detail: String,
     pub blocked: bool,
+    pub evidence_files: Vec<DlpEvidenceFile>,
 }
 
 pub fn run(rules_path: &Path) -> Result<DlpResult, String> {
@@ -46,18 +55,21 @@ pub fn run(rules_path: &Path) -> Result<DlpResult, String> {
                         action: rule.action.clone(),
                         detail: format!("检测到 USB/可移动存储: {}", devices.join(", ")),
                         blocked,
+                        evidence_files: vec![],
                     });
                 }
             }
             "sensitive_path" => {
-                if let Some(found) = scan_sensitive_files(rule.patterns.as_deref().unwrap_or(&[])) {
+                let scan = scan_sensitive_files(rule.patterns.as_deref().unwrap_or(&[]));
+                if let Some((detail, evidence)) = scan {
                     violations.push(DlpViolation {
                         rule_id: rule.id.clone(),
                         rule_name: rule.name.clone(),
                         channel: rule.channel.clone(),
                         action: rule.action.clone(),
-                        detail: found,
+                        detail,
                         blocked: false,
+                        evidence_files: evidence,
                     });
                 }
             }
@@ -140,13 +152,15 @@ fn block_usb(mounts: &[String]) -> bool {
     blocked
 }
 
-fn scan_sensitive_files(patterns: &[String]) -> Option<String> {
+fn scan_sensitive_files(patterns: &[String]) -> Option<(String, Vec<DlpEvidenceFile>)> {
     if patterns.is_empty() {
         return None;
     }
     let home = std::env::var("HOME").ok()?;
     let downloads = format!("{home}/Downloads");
     let mut hits = Vec::new();
+    let mut evidence = Vec::new();
+    const MAX_BYTES: usize = 65_536;
     for pattern in patterns {
         let ext = pattern.trim_start_matches('*');
         if ext.is_empty() {
@@ -154,9 +168,21 @@ fn scan_sensitive_files(patterns: &[String]) -> Option<String> {
         }
         if let Ok(entries) = fs::read_dir(&downloads) {
             for entry in entries.flatten() {
+                let path = entry.path();
                 let name = entry.file_name().to_string_lossy().to_string();
-                if name.ends_with(ext) {
-                    hits.push(name);
+                if !name.ends_with(ext) {
+                    continue;
+                }
+                hits.push(name.clone());
+                if let Ok(data) = fs::read(&path) {
+                    if data.len() <= MAX_BYTES {
+                        evidence.push(DlpEvidenceFile {
+                            filename: name,
+                            sha256: sha256_hex(&data),
+                            content_base64: base64_encode(&data),
+                            size_bytes: data.len(),
+                        });
+                    }
                 }
             }
         }
@@ -164,8 +190,22 @@ fn scan_sensitive_files(patterns: &[String]) -> Option<String> {
     if hits.is_empty() {
         None
     } else {
-        Some(format!("Downloads 目录发现敏感文件: {}", hits.join(", ")))
+        Some((
+            format!("Downloads 目录发现敏感文件: {}", hits.join(", ")),
+            evidence,
+        ))
     }
+}
+
+fn sha256_hex(data: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let hash = Sha256::digest(data);
+    format!("sha256:{:x}", hash)
+}
+
+fn base64_encode(data: &[u8]) -> String {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    STANDARD.encode(data)
 }
 
 fn now_epoch() -> String {
