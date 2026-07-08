@@ -1,6 +1,9 @@
 package com.sentinelhub.api.client;
 
 import com.sentinelhub.common.dto.ApiResponse;
+import com.sentinelhub.module.asset.AssetService;
+import com.sentinelhub.module.device.DeviceService;
+import com.sentinelhub.module.identity.IdentityService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -12,11 +15,21 @@ import java.util.Map;
 
 /**
  * PC client background service API — register, heartbeat, report.
- * Base path: /api/client/v1/service
  */
 @RestController
 @RequestMapping("/api/client/v1/service")
 public class ClientServiceController {
+
+    private final IdentityService identityService;
+    private final DeviceService deviceService;
+    private final AssetService assetService;
+
+    public ClientServiceController(IdentityService identityService, DeviceService deviceService,
+                                   AssetService assetService) {
+        this.identityService = identityService;
+        this.deviceService = deviceService;
+        this.assetService = assetService;
+    }
 
     @GetMapping("/info")
     public ApiResponse<Map<String, String>> info() {
@@ -27,28 +40,47 @@ public class ClientServiceController {
     }
 
     @PostMapping("/register")
-    public ApiResponse<Map<String, String>> register(@RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(Map.of(
-                "status", "pending",
-                "message", "registration endpoint ready"
-        ));
+    public ApiResponse<Map<String, Object>> register(@RequestBody Map<String, Object> body) {
+        String tenantToken = stringVal(body.get("tenant_token"));
+        if (tenantToken == null || tenantToken.isBlank()) {
+            throw new IllegalArgumentException("tenant_token required");
+        }
+        String tenantId = identityService.resolveTenantByRegistrationToken(tenantToken);
+        return ApiResponse.ok(deviceService.register(tenantId, tenantToken, body));
     }
 
     @PostMapping("/heartbeat")
     public ApiResponse<Map<String, Object>> heartbeat(@RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(Map.of(
-                "server_time", java.time.Instant.now().toString(),
-                "commands", Collections.emptyList()
-        ));
+        String clientId = stringVal(body.get("client_id"));
+        if (clientId == null || clientId.isBlank()) {
+            throw new IllegalArgumentException("client_id required");
+        }
+        String version = stringVal(body.get("version"));
+        return ApiResponse.ok(deviceService.heartbeatGlobal(clientId));
     }
 
     @PostMapping("/report/assets")
     public ApiResponse<Map<String, String>> reportAssets(@RequestBody Map<String, Object> body) {
+        String clientId = stringVal(body.get("client_id"));
+        if (clientId == null || clientId.isBlank()) {
+            throw new IllegalArgumentException("client_id required");
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> assets = body.get("assets") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m : Map.of();
+
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        assetService.ingestReport(device.tenantId(), device.deviceId(), assets);
         return ApiResponse.ok(Map.of("status", "accepted"));
     }
 
     @PostMapping("/report/events")
     public ApiResponse<Map<String, String>> reportEvents(@RequestBody Map<String, Object> body) {
         return ApiResponse.ok(Map.of("status", "accepted"));
+    }
+
+    private static String stringVal(Object o) {
+        return o != null ? o.toString() : null;
     }
 }

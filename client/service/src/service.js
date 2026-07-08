@@ -1,6 +1,7 @@
 import { collectAssets } from './collectors/index.js';
 import { resolveNativeBin } from './native-bridge.js';
 import { LocalServer } from './local-server.js';
+import { loadClientState, saveClientState } from './state.js';
 
 /**
  * PC client background service — orchestration layer.
@@ -76,11 +77,22 @@ export class ClientService {
     });
     await this.localServer.start();
 
+    const saved = await loadClientState();
+    if (saved.client_id) {
+      this.state.clientId = saved.client_id;
+      this.config.clientId = saved.client_id;
+    }
+
+    await this.collectAndReportAssets();
+
     if (!this.state.clientId) {
       await this.register();
     }
 
-    await this.collectAndReportAssets();
+    if (this.assets && this.state.clientId) {
+      await this.reportAssets(this.assets);
+    }
+
     await this.heartbeat();
 
     this.heartbeatTimer = setInterval(() => this.heartbeat(), this.config.heartbeatIntervalMs);
@@ -107,6 +119,7 @@ export class ClientService {
   async register() {
     const url = `${this.config.serverUrl}/api/client/v1/service/register`;
     try {
+      const hardware = this.assets?.hardware ?? {};
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -114,6 +127,10 @@ export class ClientService {
           tenant_token: this.config.tenantToken,
           version: this.config.version,
           client_id: this.config.clientId || undefined,
+          hostname: hardware.hostname,
+          os_type: hardware.os_type,
+          os_version: hardware.os_version,
+          hardware,
         }),
       });
       const body = await res.json();
@@ -121,7 +138,10 @@ export class ClientService {
       if (clientId) {
         this.state.clientId = clientId;
         this.config.clientId = clientId;
+        await saveClientState({ client_id: clientId });
         console.log(`[sentinel-service] registered client_id=${clientId}`);
+      } else if (!res.ok) {
+        console.error('[sentinel-service] register failed:', body?.message ?? res.status);
       }
     } catch (err) {
       console.error('[sentinel-service] register failed:', err.message);
@@ -159,7 +179,9 @@ export class ClientService {
       console.log(
         `[sentinel-service] assets collected (${this.assets.source}), software=${this.assets.software?.length ?? 0}`,
       );
-      await this.reportAssets(this.assets);
+      if (this.state.clientId) {
+        await this.reportAssets(this.assets);
+      }
     } catch (err) {
       console.error('[sentinel-service] asset collect failed:', err.message);
     }

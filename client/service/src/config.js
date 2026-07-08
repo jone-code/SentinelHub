@@ -7,7 +7,7 @@ export function loadConfig() {
   return {
     serverUrl: process.env.CLIENT_SERVER_URL || 'http://localhost:8080',
     clientId: process.env.CLIENT_ID || '',
-    tenantToken: process.env.CLIENT_TENANT_TOKEN || '',
+    tenantToken: process.env.CLIENT_TENANT_TOKEN || 'demo-token',
     version: process.env.CLIENT_VERSION || '0.1.0-dev',
     heartbeatIntervalMs: intervalSec * 1000,
     localHost: process.env.CLIENT_LOCAL_HOST || '127.0.0.1',

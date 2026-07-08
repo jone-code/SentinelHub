@@ -1,8 +1,10 @@
-import { Layout, Menu, Typography } from 'antd';
-import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import { Layout, Menu, Typography, Button } from 'antd';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Dashboard from './pages/dashboard';
 import Devices from './pages/devices';
 import Audit from './pages/audit';
+import Login from './pages/login';
+import { getToken, clearToken } from './api/client';
 
 const { Header, Sider, Content } = Layout;
 
@@ -16,8 +18,21 @@ const menuItems = [
   { key: '/audit', label: <Link to="/audit">审计日志</Link> },
 ];
 
-export default function App() {
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  if (!getToken()) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
+function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const logout = () => {
+    clearToken();
+    navigate('/login');
+  };
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -30,8 +45,9 @@ export default function App() {
         <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={menuItems} />
       </Sider>
       <Layout>
-        <Header style={{ background: '#fff', padding: '0 24px' }}>
+        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography.Text type="secondary">企业安全办公平台</Typography.Text>
+          <Button onClick={logout}>退出</Button>
         </Header>
         <Content style={{ margin: 24 }}>
           <Routes>
@@ -43,6 +59,15 @@ export default function App() {
         </Content>
       </Layout>
     </Layout>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/*" element={<RequireAuth><AppLayout /></RequireAuth>} />
+    </Routes>
   );
 }
 

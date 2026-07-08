@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: sentinelhub-server
+  jackson:
+    property-naming-strategy: SNAKE_CASE
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:sentinelhub}?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: ${DB_USER:sentinel}
@@ -25,3 +27,12 @@ sentinelhub:
     admin-prefix: /api/admin/v1
     app-prefix: /api/app/v1
     client-prefix: /api/client/v1
+  jwt:
+    secret: ${JWT_SECRET:sentinelhub-dev-secret-change-in-production-32bytes!}
+    expiration-hours: ${JWT_EXPIRATION_HOURS:24}
+  seed:
+    enabled: ${SEED_ENABLED:true}
+    admin-email: ${SEED_ADMIN_EMAIL:admin@demo.local}
+    admin-password: ${SEED_ADMIN_PASSWORD:admin123}
+    tenant-slug: ${SEED_TENANT_SLUG:demo}
+    registration-token: ${SEED_REGISTRATION_TOKEN:demo-token}

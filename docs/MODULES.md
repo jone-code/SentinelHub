@@ -6,7 +6,7 @@
 |----|------|------|-----|
 | 管理控制台 | `console/` | React + Ant Design | `/api/admin/v1` |
 | **手机 + PC 客户端** | `client/` | **Flutter** | `/api/app/v1`（手机）/ `/api/client/v1`（PC） |
-| PC 后台服务 | `client/service/` | Node.js | `/api/client/v1/service` |
+| PC 后台服务 | `client/service/` | Node.js + Rust native | `/api/client/v1/service` |
 
 > 手机与 PC **共用** `client/lib/` Flutter 代码，按平台自适应布局与 API。
 
@@ -14,16 +14,16 @@
 
 | 包路径 | 阶段 | 状态 |
 |--------|------|------|
-| `module.identity` | P0 | 骨架 |
-| `module.device` | P0 | 骨架 |
-| `module.asset` | P0 | 骨架 |
-| `module.audit` | P0 | 骨架 |
+| `module.identity` | P0 | **登录/JWT/种子数据** |
+| `module.device` | P0 | **注册/心跳/列表** |
+| `module.asset` | P0 | **资产上报/入库** |
+| `module.audit` | P0 | **审计写入/查询** |
 | `module.policy` | P1 | 骨架 |
 | 其他模块 | P1~P4 | 骨架 |
 
-## 下一步（P0）
+## 下一步（P0 剩余）
 
-1. `module.identity` + 管理端登录
-2. `module.device` + PC Node.js 服务注册/心跳
-3. Flutter 对接 `/api/client/v1` 与 `/api/app/v1`
-4. 管理控制台设备列表
+1. Flutter 对接真实 API（合规/状态页）
+2. `flutter create` 生成平台工程
+3. 设备在线状态统计（仪表盘）
+4. ClickHouse 审计迁移（可选）
