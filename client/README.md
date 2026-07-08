@@ -33,7 +33,9 @@ cd client/service && npm start
 ## 构建
 
 ```bash
-flutter build apk
-flutter build windows
-# Node 服务随安装包捆绑，见 service/README.md
+# 首次需生成平台工程（需安装 Flutter SDK）
+./tool/create_platforms.sh
+
+flutter pub get
+flutter run -d linux    # 或 windows / android
 ```

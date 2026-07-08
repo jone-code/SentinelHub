@@ -23,6 +23,16 @@ class LocalServiceClient {
       return null;
     }
   }
+
+  Future<Map<String, dynamic>?> getAssets() async {
+    if (!isSupported) return null;
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('/local/assets');
+      return res.data;
+    } on DioException {
+      return null;
+    }
+  }
 }
 
 class LocalServiceStatus {

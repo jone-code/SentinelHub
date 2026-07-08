@@ -84,6 +84,66 @@ public class DeviceService {
         return deviceRepository.countByTenant(tenantId);
     }
 
+    public int countOnlineDevices(String tenantId) {
+        Instant since = Instant.now().minus(ONLINE_THRESHOLD);
+        return deviceRepository.countOnlineByTenant(tenantId, since);
+    }
+
+    public Map<String, Object> dashboardSummary(String tenantId) {
+        int total = countDevices(tenantId);
+        int online = countOnlineDevices(tenantId);
+        double complianceAvg = deviceRepository.averageComplianceScore(tenantId);
+        return Map.of(
+                "device_total", total,
+                "device_online", online,
+                "alert_open", 0,
+                "compliance_avg", Math.round(complianceAvg)
+        );
+    }
+
+    public Map<String, Object> getUiStatus(String clientId) {
+        return deviceRepository.findByAgentIdAny(clientId)
+                .map(d -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("compliance_score", d.complianceScore() != null ? d.complianceScore() : 0);
+                    m.put("trust_score", 0);
+                    m.put("service_running", resolveDisplayStatus(d).equals("online"));
+                    m.put("pending_items", 0);
+                    m.put("unread_notifications", 0);
+                    m.put("client_id", d.agentId());
+                    m.put("hostname", d.hostname());
+                    m.put("last_seen_at", d.lastSeenAt() != null ? d.lastSeenAt().toString() : null);
+                    return m;
+                })
+                .orElse(Map.of(
+                        "compliance_score", 0,
+                        "trust_score", 0,
+                        "service_running", false,
+                        "pending_items", 0,
+                        "unread_notifications", 0
+                ));
+    }
+
+    public Map<String, Object> getCompliance(String clientId) {
+        return deviceRepository.findByAgentIdAny(clientId)
+                .map(d -> Map.<String, Object>of(
+                        "score", d.complianceScore() != null ? d.complianceScore() : 0,
+                        "items", List.of(
+                                Map.of("name", "操作系统补丁", "status", "pending"),
+                                Map.of("name", "杀毒软件", "status", "pending"),
+                                Map.of("name", "防火墙", "status", "pending"),
+                                Map.of("name", "磁盘加密", "status", "pending")
+                        )
+                ))
+                .orElse(Map.of("score", 0, "items", List.of()));
+    }
+
+    public Map<String, Object> getDeviceForAdmin(String tenantId, String deviceId) {
+        Device d = deviceRepository.findById(tenantId, deviceId)
+                .orElseThrow(() -> new IllegalArgumentException("device not found"));
+        return toAdminView(d);
+    }
+
     public java.util.Optional<OptionalDevice> resolveClient(String clientId) {
         return deviceRepository.findByAgentIdAny(clientId)
                 .map(d -> new OptionalDevice(d.tenantId(), d.agentId(), d.id()));

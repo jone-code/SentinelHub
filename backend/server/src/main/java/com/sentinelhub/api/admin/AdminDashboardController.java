@@ -25,12 +25,6 @@ public class AdminDashboardController {
         if (ctx == null || ctx.tenantId() == null) {
             throw new IllegalArgumentException("unauthorized");
         }
-        int total = deviceService.countDevices(ctx.tenantId());
-        return ApiResponse.ok(Map.of(
-                "device_total", total,
-                "device_online", 0,
-                "alert_open", 0,
-                "compliance_avg", 0
-        ));
+        return ApiResponse.ok(deviceService.dashboardSummary(ctx.tenantId()));
     }
 }

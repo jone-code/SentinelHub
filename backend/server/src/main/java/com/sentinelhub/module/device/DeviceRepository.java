@@ -63,6 +63,20 @@ public class DeviceRepository {
         return count != null ? count : 0;
     }
 
+    public int countOnlineByTenant(String tenantId, Instant since) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM devices WHERE tenant_id = ? AND last_seen_at >= ?",
+                Integer.class, tenantId, Timestamp.from(since));
+        return count != null ? count : 0;
+    }
+
+    public Double averageComplianceScore(String tenantId) {
+        Double avg = jdbc.queryForObject(
+                "SELECT AVG(compliance_score) FROM devices WHERE tenant_id = ? AND compliance_score IS NOT NULL",
+                Double.class, tenantId);
+        return avg != null ? avg : 0.0;
+    }
+
     public Device insert(String tenantId, String agentId, String hostname, String osType,
                          String osVersion, String hardwareId) {
         String id = UUID.randomUUID().toString();

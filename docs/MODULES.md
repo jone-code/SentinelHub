@@ -21,9 +21,8 @@
 | `module.policy` | P1 | 骨架 |
 | 其他模块 | P1~P4 | 骨架 |
 
-## 下一步（P0 剩余）
+## 下一步（P1 准备）
 
-1. Flutter 对接真实 API（合规/状态页）
-2. `flutter create` 生成平台工程
-3. 设备在线状态统计（仪表盘）
-4. ClickHouse 审计迁移（可选）
+1. `module.policy` 策略 CRUD 与下发
+2. Flutter 推送通知（手机端）
+3. 运行 `./tool/create_platforms.sh` 生成 iOS/Android/桌面工程并发版

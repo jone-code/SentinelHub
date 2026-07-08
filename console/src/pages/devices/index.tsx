@@ -1,6 +1,7 @@
 import { Table, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 import { api, ApiEnvelope, PageData } from '../../api/client';
+import DeviceDetailDrawer from './detail';
 
 interface DeviceRow {
   id: string;
@@ -13,6 +14,7 @@ interface DeviceRow {
 export default function Devices() {
   const [data, setData] = useState<DeviceRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<ApiEnvelope<PageData<DeviceRow>>>('/devices')
@@ -36,12 +38,19 @@ export default function Devices() {
   ];
 
   return (
-    <Table
-      columns={columns}
-      dataSource={data}
-      rowKey="id"
-      loading={loading}
-      locale={{ emptyText: '暂无设备，请部署客户端后自动纳管' }}
-    />
+    <>
+      <Table
+        columns={columns}
+        dataSource={data}
+        rowKey="id"
+        loading={loading}
+        locale={{ emptyText: '暂无设备，请部署客户端后自动纳管' }}
+        onRow={(record) => ({
+          onClick: () => setSelectedId(record.id),
+          style: { cursor: 'pointer' },
+        })}
+      />
+      <DeviceDetailDrawer deviceId={selectedId} onClose={() => setSelectedId(null)} />
+    </>
   );
 }
