@@ -13,6 +13,7 @@ import Nac from './pages/nac';
 import Assets from './pages/assets';
 import Zerotrust from './pages/zerotrust';
 import Mdm from './pages/mdm';
+import Remote from './pages/remote';
 import { getToken, clearToken } from './api/client';
 
 const { Header, Sider, Content } = Layout;
@@ -29,6 +30,7 @@ const menuItems = [
   { key: '/nac', label: <Link to="/nac">网络准入</Link> },
   { key: '/zerotrust', label: <Link to="/zerotrust">零信任</Link> },
   { key: '/mdm', label: <Link to="/mdm">移动纳管</Link> },
+  { key: '/remote', label: <Link to="/remote">远程协助</Link> },
   { key: '/audit', label: <Link to="/audit">审计日志</Link> },
 ];
 
@@ -76,6 +78,7 @@ function AppLayout() {
             <Route path="/assets" element={<Assets />} />
             <Route path="/zerotrust" element={<Zerotrust />} />
             <Route path="/mdm" element={<Mdm />} />
+            <Route path="/remote" element={<Remote />} />
             <Route path="/audit" element={<Audit />} />
             <Route path="*" element={<Placeholder title="模块开发中" />} />
           </Routes>

@@ -11,6 +11,7 @@ import com.sentinelhub.module.dlp.DlpService;
 import com.sentinelhub.module.nac.NacService;
 import com.sentinelhub.module.zerotrust.ZerotrustService;
 import com.sentinelhub.module.mdm.MdmService;
+import com.sentinelhub.module.remote.RemoteService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,12 +36,14 @@ public class ClientServiceController {
     private final NacService nacService;
     private final ZerotrustService zerotrustService;
     private final MdmService mdmService;
+    private final RemoteService remoteService;
 
     public ClientServiceController(IdentityService identityService, DeviceService deviceService,
                                    AssetService assetService, PolicyService policyService,
                                    SoftwareService softwareService, ComplianceService complianceService,
                                    DlpService dlpService, NacService nacService,
-                                   ZerotrustService zerotrustService, MdmService mdmService) {
+                                   ZerotrustService zerotrustService, MdmService mdmService,
+                                   RemoteService remoteService) {
         this.identityService = identityService;
         this.deviceService = deviceService;
         this.assetService = assetService;
@@ -51,6 +54,7 @@ public class ClientServiceController {
         this.nacService = nacService;
         this.zerotrustService = zerotrustService;
         this.mdmService = mdmService;
+        this.remoteService = remoteService;
     }
 
     @GetMapping("/info")
@@ -137,6 +141,41 @@ public class ClientServiceController {
             throw new IllegalArgumentException("client_id and profile_id required");
         }
         return ApiResponse.ok(mdmService.reportAppliedForClient(clientId, profileId));
+    }
+
+    @GetMapping("/remote/active")
+    public ApiResponse<Map<String, Object>> remoteActive(@RequestParam("client_id") String clientId) {
+        return ApiResponse.ok(remoteService.getActiveForClient(clientId));
+    }
+
+    @PostMapping("/remote/consent")
+    public ApiResponse<Map<String, Object>> remoteConsent(@RequestBody Map<String, Object> body) {
+        String clientId = stringVal(body.get("client_id"));
+        String sessionId = stringVal(body.get("session_id"));
+        if (clientId == null || sessionId == null) {
+            throw new IllegalArgumentException("client_id and session_id required");
+        }
+        boolean accepted = body.get("accepted") == null || Boolean.TRUE.equals(body.get("accepted"))
+                || "true".equalsIgnoreCase(String.valueOf(body.get("accepted")));
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        return ApiResponse.ok(remoteService.handleConsent(
+                device.tenantId(), device.deviceId(), clientId, sessionId, accepted));
+    }
+
+    @PostMapping("/remote/status")
+    public ApiResponse<Map<String, Object>> remoteStatus(@RequestBody Map<String, Object> body) {
+        String clientId = stringVal(body.get("client_id"));
+        String sessionId = stringVal(body.get("session_id"));
+        String status = stringVal(body.get("status"));
+        if (clientId == null || sessionId == null || status == null) {
+            throw new IllegalArgumentException("client_id, session_id and status required");
+        }
+        String recordingKey = stringVal(body.get("recording_key"));
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        return ApiResponse.ok(remoteService.reportStatus(
+                device.tenantId(), device.deviceId(), clientId, sessionId, status, recordingKey));
     }
 
     @PostMapping("/report/dlp-evidence")

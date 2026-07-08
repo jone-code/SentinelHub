@@ -8,10 +8,12 @@ import com.sentinelhub.module.dlp.DlpService;
 import com.sentinelhub.module.nac.NacService;
 import com.sentinelhub.module.zerotrust.ZerotrustService;
 import com.sentinelhub.module.mdm.MdmService;
+import com.sentinelhub.module.remote.RemoteService;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,11 +32,13 @@ public class DeviceService {
     private final NacService nacService;
     private final ZerotrustService zerotrustService;
     private final MdmService mdmService;
+    private final RemoteService remoteService;
 
     public DeviceService(DeviceRepository deviceRepository, AuditService auditService,
                          PolicyService policyService, ComplianceService complianceService,
                          DlpService dlpService, NacService nacService,
-                         ZerotrustService zerotrustService, MdmService mdmService) {
+                         ZerotrustService zerotrustService, MdmService mdmService,
+                         RemoteService remoteService) {
         this.deviceRepository = deviceRepository;
         this.auditService = auditService;
         this.policyService = policyService;
@@ -43,6 +47,7 @@ public class DeviceService {
         this.nacService = nacService;
         this.zerotrustService = zerotrustService;
         this.mdmService = mdmService;
+        this.remoteService = remoteService;
     }
 
     public Map<String, Object> register(String tenantId, String tenantToken, Map<String, Object> body) {
@@ -86,7 +91,8 @@ public class DeviceService {
                 deviceRepository.updateHeartbeat(device.tenantId(), clientId, null, null, null));
         Map<String, Object> response = new HashMap<>();
         response.put("server_time", Instant.now().toString());
-        response.put("commands", List.of());
+        List<Map<String, Object>> commands = new ArrayList<>(remoteService.getCommandsForClient(clientId));
+        response.put("commands", commands);
         Map<String, Object> bundle = policyService.getBundleSummaryForClient(clientId);
         if (!bundle.isEmpty()) {
             response.put("policy_bundle", bundle);

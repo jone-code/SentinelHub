@@ -10,6 +10,7 @@ import { enforceSoftware, violationsToEvents } from './enforcers/software.js';
 import { enforceDlp, dlpViolationsToEvents } from './enforcers/dlp.js';
 import { evaluateNac } from './enforcers/nac.js';
 import { scanCompliance } from './collectors/compliance.js';
+import { handleRemoteCommand } from './remote.js';
 
 /**
  * PC client background service — orchestration layer.
@@ -57,6 +58,10 @@ export class ClientService {
     this.reportedViolations = new Set();
     /** @type {Set<string>} */
     this.reportedDlpViolations = new Set();
+    /** @type {object | null} */
+    this.remoteSession = null;
+    /** @type {Set<string>} */
+    this.handledRemoteSessions = new Set();
   }
 
   getLocalStatus() {
@@ -93,6 +98,7 @@ export class ClientService {
         access_state: this.nacStatus?.access_state ?? null,
         compliance_score: this.lastComplianceScore,
       },
+      remote: this.remoteSession,
       started_at: this.state.startedAt,
     };
   }
@@ -255,6 +261,24 @@ export class ClientService {
       if (nacSummary && this.state.clientId) {
         this.nacPolicy = await syncNacPolicy(this.config, this.state.clientId, nacSummary);
         await this.runNacEvaluation();
+      }
+      const commands = body?.data?.commands;
+      if (Array.isArray(commands) && this.state.clientId) {
+        for (const command of commands) {
+          if (command?.type === 'remote.request' && command.session_id) {
+            if (this.handledRemoteSessions.has(command.session_id)) continue;
+            this.handledRemoteSessions.add(command.session_id);
+            const result = await handleRemoteCommand(this.config, this.state.clientId, command);
+            if (result) {
+              this.remoteSession = {
+                session_id: command.session_id,
+                operator_name: command.operator_name,
+                status: result.status ?? 'active',
+                reason: command.reason,
+              };
+            }
+          }
+        }
       }
       await this.runEnforcement();
       console.log('[sentinel-service] heartbeat ok', body?.data?.server_time ?? res.status);

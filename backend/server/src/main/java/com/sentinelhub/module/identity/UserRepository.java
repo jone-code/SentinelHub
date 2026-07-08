@@ -30,6 +30,13 @@ public class UserRepository {
         this.jdbc = jdbc;
     }
 
+    public Optional<User> findById(String tenantId, String userId) {
+        var list = jdbc.query(
+                "SELECT * FROM users WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL",
+                ROW_MAPPER, tenantId, userId);
+        return list.stream().findFirst();
+    }
+
     public Optional<User> findByEmail(String tenantId, String email) {
         var list = jdbc.query(
                 "SELECT * FROM users WHERE tenant_id = ? AND email = ? AND deleted_at IS NULL",
