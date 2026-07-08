@@ -75,7 +75,7 @@
 | GET | `/api/client/v1/compliance` | 合规检查明细 |
 | GET | `/api/client/v1/notifications` | 安全通知列表（规划） |
 
-### 6.2 后台服务接口 — 供 Go 服务进程
+### 6.2 后台服务接口 — 供 Node.js 后台服务进程
 
 | Method | Path | 说明 |
 |--------|------|------|

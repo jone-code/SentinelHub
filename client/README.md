@@ -9,59 +9,30 @@
 ```
 client/
 ├── lib/                    # Flutter UI（手机 + PC 共享）
-│   ├── api/                # API 客户端
-│   ├── pages/              # 页面
-│   └── platform/           # 平台差异（API 路径、布局）
-├── android/ ios/           # 移动端工程
-├── windows/ macos/ linux/  # 桌面端工程
-└── service/                # PC 专用 Go 后台服务（心跳、策略、采集）
+├── android/ ios/           # 移动端
+├── windows/ macos/ linux/  # 桌面端
+└── service/                # PC 专用 Node.js 后台服务
 ```
 
 | 平台 | UI | 后台服务 | API |
 |------|-----|----------|-----|
-| iOS / Android | Flutter | —（后期可扩展） | `/api/app/v1` |
-| Windows / macOS / Linux | Flutter | Go `service/` | `/api/client/v1` + `/api/client/v1/service` |
-
-## 页面（手机 + PC 共享）
-
-| 页面 | 路径 | 说明 |
-|------|------|------|
-| 首页 | `/` | 安全状态概览 |
-| 合规 | `/compliance` | 合规检查项 |
-| 本机 | `/device` | 设备信息 |
-| 通知 | `/notifications` | 安全通知 |
-| 设置 | `/settings` | 服务器、自启动等 |
-
-- **手机**：底部 `NavigationBar`
-- **PC**：左侧 `NavigationRail`
+| iOS / Android | Flutter | — | `/api/app/v1` |
+| Windows / macOS / Linux | Flutter | **Node.js** `service/` | `/api/client/v1` + `/api/client/v1/service` |
 
 ## 开发
 
 ```bash
-# 安装 Flutter SDK 3.24+ 后：
-cd client
-flutter pub get
-flutter run -d windows    # PC
-flutter run -d macos
-flutter run -d chrome     # Web 调试（可选）
-flutter run                 # 连接手机/模拟器
+# Flutter UI
+cd client && flutter pub get && flutter run -d windows
+
+# PC 后台服务（另开终端）
+cd client/service && npm start
 ```
 
 ## 构建
 
 ```bash
-flutter build apk          # Android
-flutter build ios          # iOS
-flutter build windows      # Windows
-flutter build macos        # macOS
-flutter build linux        # Linux
-```
-
-## PC 后台服务（Go）
-
-桌面端另需常驻后台服务，与 Flutter UI 配合：
-
-```bash
-cd client/service
-CLIENT_SERVER_URL=http://localhost:8080 go run ./cmd/service
+flutter build apk
+flutter build windows
+# Node 服务随安装包捆绑，见 service/README.md
 ```

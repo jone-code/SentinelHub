@@ -11,11 +11,8 @@ pom.xml.releaseBackup
 pom.xml.versionsBackup
 release.properties
 
-# Go (Agent only)
+# Build output
 /bin/
-agent/build/
-*.test
-*.out
 
 # Node
 node_modules/

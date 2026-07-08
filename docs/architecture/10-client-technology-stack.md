@@ -16,7 +16,7 @@ SentinelHub 有两类**用户端客户端** + 一类**管理端**：
     │  PC 浏览器      │   │   │ 手机端   │  PC 端   │        │
     └───────────────┘   │   │iOS/Andrd│Win/Mac/Lx│        │
                         │   └─────────┴────┬────┘        │
-                        │                  │ Go 后台服务  │
+                        │                  │ Node 后台服务 │
                         └──────────────────┴──────────────┘
 ```
 
@@ -28,7 +28,7 @@ SentinelHub 有两类**用户端客户端** + 一类**管理端**：
 |--------|------|----------|------|-----|
 | 管理控制台 | `console/` | PC 浏览器 | React + Ant Design | `/api/admin/v1` |
 | **统一客户端** | `client/` | **iOS / Android / Win / macOS / Linux** | **Flutter** | 见下表 |
-| PC 后台服务 | `client/service/` | 仅桌面端 | Go | `/api/client/v1/service` |
+| PC 后台服务 | `client/service/` | 仅桌面端 | Node.js | `/api/client/v1/service` |
 
 ### 统一客户端 API 分工
 
@@ -36,7 +36,7 @@ SentinelHub 有两类**用户端客户端** + 一类**管理端**：
 |------|---------------|------|
 | 手机 iOS/Android | `/api/app/v1` | 移动端精简接口 |
 | PC 桌面 Flutter UI | `/api/client/v1` | 本机状态、合规、通知 |
-| PC Go 后台服务 | `/api/client/v1/service` | 注册、心跳、上报（无界面） |
+| PC Node.js 后台服务 | `/api/client/v1/service` | 注册、心跳、上报（无界面） |
 
 ---
 
@@ -127,7 +127,7 @@ client/
 ├── windows/                    # Windows 工程
 ├── macos/                      # macOS 工程
 ├── linux/                      # Linux 工程
-└── service/                    # PC 专用 Go 后台服务
+└── service/                    # PC 专用 Node.js 后台服务
 ```
 
 ### 3.6 开发与构建
@@ -160,34 +160,34 @@ flutter build linux --release
 
 ---
 
-## 4. PC 后台服务 — `client/service/`（Go）
+## 4. PC 后台服务 — `client/service/`（Node.js）
 
 **仅桌面端（Windows/macOS/Linux）需要**，与 Flutter UI 配合安装。
 
-| 职责 | Flutter UI | Go 服务 |
-|------|------------|---------|
+| 职责 | Flutter UI | Node.js 服务 |
+|------|------------|--------------|
 | 展示合规分数 | ✅ | |
 | 心跳 / 注册 | | ✅ |
 | 策略执行 | | ✅ |
 | 资产采集 | | ✅ |
 | DLP / 管控 | | ✅ |
 
-员工关掉 Flutter 窗口后，Go 服务继续常驻运行。
+员工关掉 Flutter 窗口后，Node.js 服务继续常驻运行。
 
 ```bash
 cd client/service
-CLIENT_SERVER_URL=http://localhost:8080 go run ./cmd/service
+CLIENT_SERVER_URL=http://localhost:8080 npm start
 ```
 
 ---
 
 ## 5. 三端技术对比
 
-| 维度 | 管理控制台 | 统一客户端（Flutter） | PC Go 服务 |
-|------|------------|----------------------|------------|
+| 维度 | 管理控制台 | 统一客户端（Flutter） | PC Node.js 服务 |
+|------|------------|----------------------|-----------------|
 | **用户** | 管理员 | 员工 / 管理员（移动） | 无界面 |
 | **形态** | 浏览器 | 手机 App + 桌面应用 | 系统后台进程 |
-| **语言** | TypeScript | Dart | Go |
+| **语言** | TypeScript | Dart | JavaScript |
 | **平台** | Web | iOS/Android/Win/Mac/Linux | Win/Mac/Linux |
 | **API** | `/api/admin/v1` | `/api/app/v1` 或 `/api/client/v1` | `/api/client/v1/service` |
 
@@ -209,7 +209,7 @@ CLIENT_SERVER_URL=http://localhost:8080 go run ./cmd/service
 
 | 阶段 | 交付 |
 |------|------|
-| P0 | Flutter 骨架 + 共享页面；PC Go 服务注册/心跳 |
+| P0 | Flutter 骨架 + 共享页面；PC Node.js 服务注册/心跳 |
 | P0 | 管理控制台登录、设备列表 |
 | P1 | Flutter 对接真实 API；推送通知（手机） |
 | P1 | 管理控制台策略、合规 |

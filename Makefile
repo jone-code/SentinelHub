@@ -6,7 +6,7 @@ help:
 	@echo "  make dev-down              - Stop infrastructure"
 	@echo "  make backend-build         - Build Java backend (Maven)"
 	@echo "  make backend-run           - Run unified API server"
-	@echo "  make client-service-build  - Build PC client background service (Go)"
+	@echo "  make client-service-build  - Verify PC client background service (Node.js)"
 
 dev-up:
 	docker compose -f deploy/docker-compose/docker-compose.yml up -d
@@ -21,7 +21,7 @@ backend-run:
 	cd backend && ./mvnw -pl server spring-boot:run
 
 client-service-build:
-	cd client/service && go build -o ../../bin/sentinel-service ./cmd/service
+	cd client/service && node --check src/index.js
 
 test:
 	cd backend && ./mvnw test

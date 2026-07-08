@@ -10,7 +10,7 @@
 |----|----------|--------|
 | 管理端 | `/api/admin/v1` | Web 控制台（PC 浏览器） |
 | 手机端 | `/api/app/v1` | Flutter 客户端（iOS/Android） |
-| PC 端 | `/api/client/v1` | Flutter 客户端 + Go 后台服务 |
+| PC 端 | `/api/client/v1` | Flutter 客户端 + Node.js 后台服务 |
 
 ## 技术栈
 
@@ -19,7 +19,7 @@
 | 后端 | Java 21, Spring Boot 3.3, Maven |
 | 管理控制台 | React 18, TypeScript, Vite, Ant Design |
 | 手机 + PC 客户端 | Flutter (Dart) |
-| PC 后台服务 | Go（仅桌面端常驻） |
+| PC 后台服务 | Node.js 20+（仅桌面端常驻） |
 | 存储 | MySQL, Redis, ClickHouse, MinIO |
 
 > 客户端详见 [docs/architecture/10-client-technology-stack.md](./docs/architecture/10-client-technology-stack.md)（Flutter 统一手机+PC）
@@ -38,7 +38,7 @@ SentinelHub/
 ├── console/            # PC 管理控制台（React）
 ├── client/             # 统一客户端 Flutter（iOS/Android/Win/Mac/Linux）
 │   ├── lib/            # 共享 UI 代码
-│   └── service/        # PC 专用 Go 后台服务
+│   └── service/        # PC 专用 Node.js 后台服务
 ├── deploy/             # Docker Compose / 迁移脚本
 └── docs/               # 架构文档
 ```
