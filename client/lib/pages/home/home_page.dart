@@ -1,12 +1,54 @@
 import 'package:flutter/material.dart';
+import '../../api/local_service_client.dart';
+import '../../platform/platform_info.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final _localClient = LocalServiceClient();
+  LocalServiceStatus? _localStatus;
+  bool _loadingLocal = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshLocalStatus();
+  }
+
+  Future<void> _refreshLocalStatus() async {
+    if (!PlatformInfo.isDesktop) return;
+    setState(() => _loadingLocal = true);
+    final status = await _localClient.getStatus();
+    if (mounted) {
+      setState(() {
+        _localStatus = status;
+        _loadingLocal = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final local = _localStatus;
+    final serviceOk = !PlatformInfo.isDesktop || (local?.running == true);
+    final cloudOk = !PlatformInfo.isDesktop || (local?.cloudConnected == true);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('安全状态')),
+      appBar: AppBar(
+        title: const Text('安全状态'),
+        actions: [
+          if (PlatformInfo.isDesktop)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadingLocal ? null : _refreshLocalStatus,
+            ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -24,17 +66,42 @@ class HomePage extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            const Card(
+            Card(
               child: ListTile(
-                leading: Icon(Icons.cloud_done_outlined, color: Colors.green),
-                title: Text('已连接企业管理平台'),
-                subtitle: Text('后台服务运行正常'),
+                leading: Icon(
+                  cloudOk ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
+                  color: cloudOk ? Colors.green : Colors.orange,
+                ),
+                title: Text(cloudOk ? '已连接企业管理平台' : '未连接企业管理平台'),
+                subtitle: Text(_serviceSubtitle(local, serviceOk)),
               ),
             ),
+            if (PlatformInfo.isDesktop && local?.nativeAvailable == true) ...[
+              const SizedBox(height: 8),
+              const Card(
+                child: ListTile(
+                  leading: Icon(Icons.memory_outlined, color: Colors.blue),
+                  title: Text('Native 扩展已加载'),
+                  subtitle: Text('深度采集由 sentinel-native sidecar 执行'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  String _serviceSubtitle(LocalServiceStatus? local, bool serviceOk) {
+    if (!PlatformInfo.isDesktop) return '移动端无需后台服务';
+    if (_loadingLocal) return '正在检测本地服务…';
+    if (!serviceOk) return '后台服务未运行，请启动 client/service';
+    final parts = <String>['后台服务运行正常'];
+    if (local != null && local.softwareCount > 0) {
+      parts.add('已采集 ${local.softwareCount} 个软件');
+    }
+    if (local?.clientId != null) parts.add('ID: ${local!.clientId}');
+    return parts.join(' · ');
   }
 }
 

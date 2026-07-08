@@ -11,13 +11,14 @@ client/
 ├── lib/                    # Flutter UI（手机 + PC 共享）
 ├── android/ ios/           # 移动端
 ├── windows/ macos/ linux/  # 桌面端
-└── service/                # PC 专用 Node.js 后台服务
+├── service/                # PC Node.js 编排层（云端 + 本地 IPC）
+└── native/                 # Rust sidecar（深度采集/管控）
 ```
 
 | 平台 | UI | 后台服务 | API |
 |------|-----|----------|-----|
 | iOS / Android | Flutter | — | `/api/app/v1` |
-| Windows / macOS / Linux | Flutter | **Node.js** `service/` | `/api/client/v1` + `/api/client/v1/service` |
+| Windows / macOS / Linux | Flutter | **Node.js** `service/` + **Rust** `native/` | `/api/client/v1` + `/api/client/v1/service` |
 
 ## 开发
 

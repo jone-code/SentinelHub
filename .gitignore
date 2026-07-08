@@ -13,6 +13,7 @@ release.properties
 
 # Build output
 /bin/
+client/native/target/
 
 # Node
 node_modules/
