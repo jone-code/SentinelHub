@@ -16,7 +16,7 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Run backend tests
+      - name: Run backend tests (unit + Testcontainers integration)
         run: cd backend && ./mvnw test
 
   client-service-test:

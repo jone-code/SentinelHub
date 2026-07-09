@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: true
+
+sentinelhub:
+  seed:
+    enabled: true
+    admin-email: admin@test.local
+    admin-password: testpass123
+    tenant-slug: test
+    registration-token: test-token
+  minio:
+    enabled: false
+  ai:
+    llm:
+      enabled: false
+  remote:
+    rtc:
+      stun-servers:
+        - stun:stun.test:3478
+      turn-url: turn:turn.test:3478?transport=udp
+      turn-secret: integration-turn-secret
+      turn-credential-ttl-seconds: 3600
