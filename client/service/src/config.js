@@ -22,5 +22,6 @@ export function loadConfig() {
     remoteCaptureHeight: parseInt(process.env.REMOTE_CAPTURE_HEIGHT || '720', 10),
     remoteCaptureFps: parseInt(process.env.REMOTE_CAPTURE_FPS || '10', 10),
     remoteCaptureSynthetic: process.env.REMOTE_CAPTURE_SYNTHETIC === 'true',
+    remoteCaptureBackend: process.env.REMOTE_CAPTURE_BACKEND || 'auto',
   };
 }

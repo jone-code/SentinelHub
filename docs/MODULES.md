@@ -32,20 +32,24 @@
 
 ## 远程协助桌面采集
 
-客户端服务通过 **ffmpeg** 采集真实桌面画面并推送到 WebRTC：
+客户端服务通过 **ffmpeg / grim** 采集真实桌面画面并推送到 WebRTC。Linux 支持多后端自动探测：
 
-| 平台 | ffmpeg 输入 | 环境变量 |
-|------|-------------|----------|
+| 平台 | 后端 | 条件 / 环境变量 |
+|------|------|-----------------|
 | Linux (X11) | `x11grab` | `DISPLAY`（默认 `:0.0`）、`REMOTE_CAPTURE_VIDEO_SIZE` |
+| Linux (Wayland) | `pipewire` | ffmpeg 编译含 pipewire；`REMOTE_CAPTURE_PIPEWIRE_TARGET`（默认 `screen-capture`） |
+| Linux (Wayland) | `wf-recorder` | 安装 wf-recorder；`REMOTE_CAPTURE_WAYLAND_OUTPUT` |
+| Linux (Wayland) | `grim` | 安装 grim；`REMOTE_CAPTURE_GRIM_REGION` 可选区域 |
 | macOS | `avfoundation` | `REMOTE_CAPTURE_MAC_DEVICE`（默认 `1:none`） |
 | Windows | `gdigrab` | `REMOTE_CAPTURE_WIN_INPUT`（默认 `desktop`） |
 
+**自动选择**：Wayland 会话优先 pipewire → wf-recorder → grim → x11；可用 `REMOTE_CAPTURE_BACKEND=auto|x11|pipewire|grim|wf-recorder` 强制指定。
+
 通用：`REMOTE_CAPTURE_WIDTH` / `HEIGHT` / `FPS`；`REMOTE_CAPTURE_SYNTHETIC=true` 强制测试图案。
 
-**依赖**：目标机器需安装 `ffmpeg` 且具备屏幕录制权限。
+**依赖**：`ffmpeg`；Wayland 另需 grim 或 wf-recorder 或 pipewire 版 ffmpeg；目标机器需屏幕录制权限。
 
 ## 后续增强
 
 1. 内核 minifilter 实装
-2. Wayland / PipeWire 原生采集（Linux 无 X11 时）
-3. 生产级 TURN 部署（`REMOTE_TURN_*` 环境变量）
+2. 生产级 TURN 部署（`REMOTE_TURN_*` 环境变量）

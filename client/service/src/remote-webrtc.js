@@ -3,7 +3,7 @@
  * Video: real desktop capture via ffmpeg, with synthetic test-pattern fallback.
  */
 
-import { createScreenCapture, probeScreenCapture } from './screen-capture.js';
+import { createScreenCapture, detectScreenCapture } from './screen-capture.js';
 
 let wrtcModule = null;
 
@@ -46,6 +46,7 @@ function captureOptions(config) {
     width: config.remoteCaptureWidth ?? 1280,
     height: config.remoteCaptureHeight ?? 720,
     fps: config.remoteCaptureFps ?? 10,
+    backend: config.remoteCaptureBackend ?? 'auto',
     forceSynthetic: config.remoteCaptureSynthetic === true,
   };
 }
@@ -68,9 +69,10 @@ async function attachVideoTrack(pc, config) {
 
   const cleanups = [];
 
-  const useSynthetic = opts.forceSynthetic
-    ? true
-    : !(await probeScreenCapture(320, 240));
+  const detected = opts.forceSynthetic
+    ? null
+    : await detectScreenCapture(320, 240, opts.backend);
+  const useSynthetic = !detected;
 
   if (useSynthetic) {
     console.log('[sentinel-service] remote WebRTC: using synthetic video (capture unavailable)');
@@ -96,12 +98,13 @@ async function attachVideoTrack(pc, config) {
     cleanups.push(() => clearInterval(timer));
   } else {
     console.log(
-      `[sentinel-service] remote WebRTC: desktop capture ${opts.width}x${opts.height} @ ${opts.fps}fps`,
+      `[sentinel-service] remote WebRTC: desktop capture via ${detected.backend} ${opts.width}x${opts.height} @ ${opts.fps}fps`,
     );
     const capture = createScreenCapture({
       width: opts.width,
       height: opts.height,
       fps: opts.fps,
+      backend: detected.backend,
       onFrame: (frame) => {
         try {
           source.onFrame(frame);
