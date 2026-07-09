@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: sentinelhub-server
+  jackson:
+    property-naming-strategy: SNAKE_CASE
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:sentinelhub}?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: ${DB_USER:sentinel}
@@ -25,3 +27,34 @@ sentinelhub:
     admin-prefix: /api/admin/v1
     app-prefix: /api/app/v1
     client-prefix: /api/client/v1
+  jwt:
+    secret: ${JWT_SECRET:sentinelhub-dev-secret-change-in-production-32bytes!}
+    expiration-hours: ${JWT_EXPIRATION_HOURS:24}
+  seed:
+    enabled: ${SEED_ENABLED:true}
+    admin-email: ${SEED_ADMIN_EMAIL:admin@demo.local}
+    admin-password: ${SEED_ADMIN_PASSWORD:admin123}
+    tenant-slug: ${SEED_TENANT_SLUG:demo}
+    registration-token: ${SEED_REGISTRATION_TOKEN:demo-token}
+  minio:
+    enabled: ${MINIO_ENABLED:true}
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:sentinel}
+    secret-key: ${MINIO_SECRET_KEY:sentinel123}
+    bucket: ${MINIO_DLP_BUCKET:sentinel-dlp-evidence}
+    region: ${MINIO_REGION:us-east-1}
+  ai:
+    llm:
+      enabled: ${AI_LLM_ENABLED:false}
+      base-url: ${AI_LLM_BASE_URL:https://api.openai.com/v1}
+      api-key: ${AI_LLM_API_KEY:}
+      model: ${AI_LLM_MODEL:gpt-4o-mini}
+  remote:
+    rtc:
+      stun-servers:
+        - stun:stun.l.google.com:19302
+      turn-url: ${REMOTE_TURN_URL:}
+      turn-username: ${REMOTE_TURN_USERNAME:}
+      turn-credential: ${REMOTE_TURN_CREDENTIAL:}
+      turn-secret: ${REMOTE_TURN_SECRET:}
+      turn-credential-ttl-seconds: ${REMOTE_TURN_CREDENTIAL_TTL:86400}

@@ -11,5 +11,8 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@roamhq/wrtc": "^0.10.0"
   }
 }

@@ -1,8 +1,21 @@
-import { Layout, Menu, Typography } from 'antd';
-import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import { Layout, Menu, Typography, Button } from 'antd';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Dashboard from './pages/dashboard';
 import Devices from './pages/devices';
 import Audit from './pages/audit';
+import Login from './pages/login';
+import Policies from './pages/policies';
+import DeviceGroups from './pages/device-groups';
+import Events from './pages/events';
+import Compliance from './pages/compliance';
+import Dlp from './pages/dlp';
+import Nac from './pages/nac';
+import Assets from './pages/assets';
+import Zerotrust from './pages/zerotrust';
+import Mdm from './pages/mdm';
+import Remote from './pages/remote';
+import Ai from './pages/ai';
+import { getToken, clearToken } from './api/client';
 
 const { Header, Sider, Content } = Layout;
 
@@ -11,13 +24,33 @@ const menuItems = [
   { key: '/devices', label: <Link to="/devices">设备管控</Link> },
   { key: '/assets', label: <Link to="/assets">资产管理</Link> },
   { key: '/policies', label: <Link to="/policies">策略管理</Link> },
+  { key: '/device-groups', label: <Link to="/device-groups">设备组</Link> },
+  { key: '/events', label: <Link to="/events">安全事件</Link> },
   { key: '/compliance', label: <Link to="/compliance">合规检查</Link> },
   { key: '/dlp', label: <Link to="/dlp">DLP</Link> },
+  { key: '/nac', label: <Link to="/nac">网络准入</Link> },
+  { key: '/zerotrust', label: <Link to="/zerotrust">零信任</Link> },
+  { key: '/mdm', label: <Link to="/mdm">移动纳管</Link> },
+  { key: '/remote', label: <Link to="/remote">远程协助</Link> },
+  { key: '/ai', label: <Link to="/ai">AI 分析</Link> },
   { key: '/audit', label: <Link to="/audit">审计日志</Link> },
 ];
 
-export default function App() {
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  if (!getToken()) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
+function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const logout = () => {
+    clearToken();
+    navigate('/login');
+  };
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -30,19 +63,40 @@ export default function App() {
         <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={menuItems} />
       </Sider>
       <Layout>
-        <Header style={{ background: '#fff', padding: '0 24px' }}>
+        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography.Text type="secondary">企业安全办公平台</Typography.Text>
+          <Button onClick={logout}>退出</Button>
         </Header>
         <Content style={{ margin: 24 }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/devices" element={<Devices />} />
+            <Route path="/policies" element={<Policies />} />
+            <Route path="/device-groups" element={<DeviceGroups />} />
+            <Route path="/events" element={<Events />} />
+            <Route path="/compliance" element={<Compliance />} />
+            <Route path="/dlp" element={<Dlp />} />
+            <Route path="/nac" element={<Nac />} />
+            <Route path="/assets" element={<Assets />} />
+            <Route path="/zerotrust" element={<Zerotrust />} />
+            <Route path="/mdm" element={<Mdm />} />
+            <Route path="/remote" element={<Remote />} />
+            <Route path="/ai" element={<Ai />} />
             <Route path="/audit" element={<Audit />} />
             <Route path="*" element={<Placeholder title="模块开发中" />} />
           </Routes>
         </Content>
       </Layout>
     </Layout>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/*" element={<RequireAuth><AppLayout /></RequireAuth>} />
+    </Routes>
   );
 }
 

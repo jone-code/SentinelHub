@@ -1,7 +1,15 @@
-//! SentinelHub native sidecar — invoked by Node: `sentinel-native collect --json`
+//! SentinelHub native sidecar
+//!
+//!   sentinel-native collect --json
+//!   sentinel-native enforce software --policy-file <path> --json
+
+mod enforce;
+mod scan;
+mod driver;
 
 use serde::Serialize;
 use std::env;
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize)]
@@ -30,6 +38,7 @@ struct SoftwareItem {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
     if args.len() >= 3 && args[1] == "collect" && args[2] == "--json" {
         match collect_assets() {
             Ok(json) => println!("{json}"),
@@ -40,8 +49,119 @@ fn main() {
         }
         return;
     }
-    eprintln!("usage: sentinel-native collect --json");
+
+    if args.len() >= 4 && args[1] == "enforce" && args[2] == "software" {
+        let policy_path = parse_flag_path(&args, "--policy-file")
+            .unwrap_or_else(|| {
+                eprintln!("--policy-file required");
+                std::process::exit(2);
+            });
+        let json_flag = args.iter().any(|a| a == "--json");
+        match enforce::software::run(&policy_path) {
+            Ok(result) => {
+                if json_flag {
+                    println!("{}", serde_json::to_string(&result).unwrap_or_else(|_| "{}".into()));
+                }
+            }
+            Err(err) => {
+                eprintln!("{err}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    if args.len() >= 4 && args[1] == "enforce" && args[2] == "dlp" {
+        let rules_path = parse_flag_path(&args, "--rules-file")
+            .unwrap_or_else(|| {
+                eprintln!("--rules-file required");
+                std::process::exit(2);
+            });
+        let json_flag = args.iter().any(|a| a == "--json");
+        match enforce::dlp::run(&rules_path) {
+            Ok(result) => {
+                if json_flag {
+                    println!("{}", serde_json::to_string(&result).unwrap_or_else(|_| "{}".into()));
+                }
+            }
+            Err(err) => {
+                eprintln!("{err}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    if args.len() >= 4 && args[1] == "enforce" && args[2] == "nac" {
+        let policy_path = parse_flag_path(&args, "--policy-file")
+            .unwrap_or_else(|| {
+                eprintln!("--policy-file required");
+                std::process::exit(2);
+            });
+        let score = parse_flag_i32(&args, "--compliance-score").unwrap_or(0);
+        let json_flag = args.iter().any(|a| a == "--json");
+        match enforce::nac::run(&policy_path, score) {
+            Ok(result) => {
+                if json_flag {
+                    println!("{}", serde_json::to_string(&result).unwrap_or_else(|_| "{}".into()));
+                }
+            }
+            Err(err) => {
+                eprintln!("{err}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    if args.len() >= 3 && args[1] == "driver" && args[2] == "status" {
+        let json_flag = args.iter().any(|a| a == "--json");
+        let result = driver::status();
+        if json_flag {
+            println!("{}", serde_json::to_string(&result).unwrap_or_else(|_| "{}".into()));
+        }
+        return;
+    }
+
+    if args.len() >= 3 && args[1] == "scan" && args[2] == "compliance" {
+        let json_flag = args.iter().any(|a| a == "--json");
+        let rules_path = parse_flag_path(&args, "--rules-file");
+        match scan::compliance::run(rules_path.as_deref()) {
+            Ok(result) => {
+                if json_flag {
+                    println!("{}", serde_json::to_string(&result).unwrap_or_else(|_| "{}".into()));
+                }
+            }
+            Err(err) => {
+                eprintln!("{err}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    eprintln!("usage:");
+    eprintln!("  sentinel-native collect --json");
+    eprintln!("  sentinel-native enforce software --policy-file <path> --json");
+    eprintln!("  sentinel-native enforce dlp --rules-file <path> --json");
+    eprintln!("  sentinel-native enforce nac --policy-file <path> --compliance-score <n> --json");
+    eprintln!("  sentinel-native driver status --json");
+    eprintln!("  sentinel-native scan compliance [--rules-file <path>] --json");
     std::process::exit(2);
+}
+
+fn parse_flag_path(args: &[String], flag: &str) -> Option<PathBuf> {
+    args.iter()
+        .position(|a| a == flag)
+        .and_then(|i| args.get(i + 1))
+        .map(PathBuf::from)
+}
+
+fn parse_flag_i32(args: &[String], flag: &str) -> Option<i32> {
+    args.iter()
+        .position(|a| a == flag)
+        .and_then(|i| args.get(i + 1))
+        .and_then(|v| v.parse().ok())
 }
 
 fn collect_assets() -> Result<String, String> {

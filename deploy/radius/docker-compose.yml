@@ -1,0 +1,10 @@
+services:
+  freeradius:
+    image: freeradius/freeradius-server:latest
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    volumes:
+      - ./config/clients.conf:/etc/freeradius/clients.conf:ro
+      - ./config/users:/etc/freeradius/users:ro
+    command: ["-f", "-xx"]

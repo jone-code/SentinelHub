@@ -18,6 +18,7 @@ client/native/target/
 # Node
 node_modules/
 console/dist/
+client/service/.state/
 client/dist/
 client/.dart_tool/
 client/build/

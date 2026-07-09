@@ -11,12 +11,14 @@ export class LocalServer {
    * @param {number} opts.port
    * @param {() => object} opts.getStatus
    * @param {() => object | null} opts.getAssets
+   * @param {() => object | null} opts.getPolicy
    */
-  constructor({ host, port, getStatus, getAssets }) {
+  constructor({ host, port, getStatus, getAssets, getPolicy }) {
     this.host = host;
     this.port = port;
     this.getStatus = getStatus;
     this.getAssets = getAssets;
+    this.getPolicy = getPolicy;
     /** @type {http.Server | null} */
     this.server = null;
   }
@@ -42,6 +44,17 @@ export class LocalServer {
           return;
         }
         this.json(res, assets);
+        return;
+      }
+
+      if (req.url === '/local/policy') {
+        const policy = this.getPolicy?.();
+        if (!policy) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'no policy cached' }));
+          return;
+        }
+        this.json(res, policy);
         return;
       }
 
