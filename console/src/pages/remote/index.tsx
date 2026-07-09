@@ -80,6 +80,18 @@ export default function Remote() {
     load();
   };
 
+  const downloadRecording = async (id: string) => {
+    const res = await api.get<ApiEnvelope<{ presigned_url?: string; available: boolean }>>(
+      `/remote/sessions/${id}/recording-url`,
+    );
+    const url = res.data.data.presigned_url;
+    if (url) {
+      window.open(url, '_blank');
+    } else {
+      message.info('录像暂不可用或未上传');
+    }
+  };
+
   return (
     <div>
       <Card title="发起远程协助" style={{ marginBottom: 24 }}>
@@ -126,6 +138,11 @@ export default function Remote() {
               title: '操作',
               render: (_, row) => (
                 <>
+                  {row.recording_key && (
+                    <Button type="link" onClick={() => downloadRecording(row.id)}>
+                      录像
+                    </Button>
+                  )}
                   {(row.status === 'pending' || row.status === 'active') && (
                     <>
                       <Button type="link" onClick={() => endSession(row.id)}>

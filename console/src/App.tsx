@@ -14,6 +14,7 @@ import Assets from './pages/assets';
 import Zerotrust from './pages/zerotrust';
 import Mdm from './pages/mdm';
 import Remote from './pages/remote';
+import Ai from './pages/ai';
 import { getToken, clearToken } from './api/client';
 
 const { Header, Sider, Content } = Layout;
@@ -31,6 +32,7 @@ const menuItems = [
   { key: '/zerotrust', label: <Link to="/zerotrust">零信任</Link> },
   { key: '/mdm', label: <Link to="/mdm">移动纳管</Link> },
   { key: '/remote', label: <Link to="/remote">远程协助</Link> },
+  { key: '/ai', label: <Link to="/ai">AI 分析</Link> },
   { key: '/audit', label: <Link to="/audit">审计日志</Link> },
 ];
 
@@ -79,6 +81,7 @@ function AppLayout() {
             <Route path="/zerotrust" element={<Zerotrust />} />
             <Route path="/mdm" element={<Mdm />} />
             <Route path="/remote" element={<Remote />} />
+            <Route path="/ai" element={<Ai />} />
             <Route path="/audit" element={<Audit />} />
             <Route path="*" element={<Placeholder title="模块开发中" />} />
           </Routes>

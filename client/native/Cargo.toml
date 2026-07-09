@@ -1,3 +1,7 @@
+[workspace]
+members = [".", "driver/sentinel-driver"]
+resolver = "2"
+
 [package]
 name = "sentinel-native"
 version = "0.1.0"

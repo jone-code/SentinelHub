@@ -99,6 +99,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sentinel-driver"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "sentinel-native"
 version = "0.1.0"
 dependencies = [

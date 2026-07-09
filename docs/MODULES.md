@@ -26,11 +26,12 @@
 | `module.zerotrust` | P3 | **信任分/受保护应用/历史记录** |
 | `module.mdm` | P3 | **配置描述文件/设备分配** |
 | `module.asset` | P3 | **租户级资产清单页** |
-| `module.remote` | P4 | **远程协助会话/审计/客户端命令** |
-| 其他模块 | P4 | 骨架 |
+| `module.remote` | P4 | **远程协助/WebRTC 信令/MinIO 录像** |
+| `module.ai` | P4 | **规则引擎安全洞察** |
+| 内核驱动 | P4 | **userspace daemon（Unix socket）** |
 
-## 下一步（P4 剩余）
+## 后续增强
 
-1. Rust 驱动实装（`native/driver/`）
-2. AI 辅助分析（`module.ai`）
-3. 远程桌面实连（WebRTC / 录像上传 MinIO）
+1. 内核 minifilter 实装（替换 userspace daemon 后端）
+2. LLM 接入 `module.ai`（当前为规则引擎）
+3. WebRTC 媒体通道实连

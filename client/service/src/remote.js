@@ -25,6 +25,11 @@ export async function handleRemoteCommand(config, clientId, command) {
   console.log(
     `[sentinel-service] remote session ${sessionId} accepted (operator=${command.operator_name ?? 'unknown'})`,
   );
+  try {
+    await uploadRecordingStub(config, clientId, sessionId);
+  } catch (err) {
+    console.warn('[sentinel-service] remote recording upload failed:', err.message);
+  }
   return body?.data ?? null;
 }
 
@@ -44,6 +49,29 @@ export async function endRemoteSession(config, clientId, sessionId, recordingKey
       session_id: sessionId,
       status: 'ended',
       recording_key: recordingKey ?? null,
+    }),
+  });
+}
+
+/**
+ * Upload session recording metadata to MinIO via backend.
+ */
+export async function uploadRecordingStub(config, clientId, sessionId) {
+  const metadata = JSON.stringify({
+    session_id: sessionId,
+    recorded_at: new Date().toISOString(),
+    note: 'WebRTC media channel not connected; metadata-only recording stub',
+  });
+  const contentBase64 = Buffer.from(metadata, 'utf8').toString('base64');
+  const url = `${config.serverUrl}/api/client/v1/service/remote/recording`;
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: clientId,
+      session_id: sessionId,
+      content_base64: contentBase64,
+      content_type: 'application/json',
     }),
   });
 }

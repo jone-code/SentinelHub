@@ -11,6 +11,7 @@ import { enforceDlp, dlpViolationsToEvents } from './enforcers/dlp.js';
 import { evaluateNac } from './enforcers/nac.js';
 import { scanCompliance } from './collectors/compliance.js';
 import { handleRemoteCommand } from './remote.js';
+import { ensureDriverDaemon, queryDriverViaNative, resolveDriverBin } from './driver-bridge.js';
 
 /**
  * PC client background service — orchestration layer.
@@ -62,6 +63,8 @@ export class ClientService {
     this.remoteSession = null;
     /** @type {Set<string>} */
     this.handledRemoteSessions = new Set();
+    /** @type {object | null} */
+    this.driverStatus = null;
   }
 
   getLocalStatus() {
@@ -99,6 +102,7 @@ export class ClientService {
         compliance_score: this.lastComplianceScore,
       },
       remote: this.remoteSession,
+      driver: this.driverStatus,
       started_at: this.state.startedAt,
     };
   }
@@ -113,6 +117,14 @@ export class ClientService {
 
     this.nativeBin = await resolveNativeBin(this.config.nativeBin);
     this.state.nativeAvailable = Boolean(this.nativeBin);
+    const driverBin = await resolveDriverBin(this.config.driverBin);
+    if (driverBin) {
+      await ensureDriverDaemon(driverBin, this.nativeBin);
+      this.driverStatus = await queryDriverViaNative(this.nativeBin);
+      if (this.driverStatus?.available) {
+        console.log(`[sentinel-service] driver daemon: ${this.driverStatus.mode}`);
+      }
+    }
     if (this.nativeBin) {
       console.log(`[sentinel-service] native sidecar: ${this.nativeBin}`);
     } else {

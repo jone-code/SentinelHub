@@ -45,7 +45,9 @@ public class SecurityConfig {
                                 "/api/client/v1/service/report/mdm-applied",
                                 "/api/client/v1/service/remote/active",
                                 "/api/client/v1/service/remote/consent",
-                                "/api/client/v1/service/remote/status").permitAll()
+                                "/api/client/v1/service/remote/status",
+                                "/api/client/v1/service/remote/signal",
+                                "/api/client/v1/service/remote/recording").permitAll()
                         .requestMatchers("/api/client/v1/info", "/api/client/v1/status", "/api/client/v1/trust").permitAll()
                         .requestMatchers("/api/admin/v1/**").authenticated()
                         .requestMatchers("/api/app/v1/**").authenticated()

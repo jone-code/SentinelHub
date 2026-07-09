@@ -178,6 +178,51 @@ public class ClientServiceController {
                 device.tenantId(), device.deviceId(), clientId, sessionId, status, recordingKey));
     }
 
+    @PostMapping("/remote/signal")
+    public ApiResponse<Map<String, Object>> remoteSignal(@RequestBody Map<String, Object> body) {
+        String clientId = stringVal(body.get("client_id"));
+        String sessionId = stringVal(body.get("session_id"));
+        String sdpType = stringVal(body.get("sdp_type"));
+        String sdpPayload = stringVal(body.get("sdp_payload"));
+        if (clientId == null || sessionId == null || sdpPayload == null) {
+            throw new IllegalArgumentException("client_id, session_id and sdp_payload required");
+        }
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        return ApiResponse.ok(remoteService.postClientSignaling(
+                device.tenantId(), device.deviceId(), clientId, sessionId,
+                sdpType != null ? sdpType : "answer", sdpPayload));
+    }
+
+    @GetMapping("/remote/signal")
+    public ApiResponse<Map<String, Object>> getAdminSignal(
+            @RequestParam("client_id") String clientId,
+            @RequestParam("session_id") String sessionId) {
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        return ApiResponse.ok(remoteService.getSignalingForRole(device.tenantId(), sessionId, "admin"));
+    }
+
+    @PostMapping("/remote/recording")
+    public ApiResponse<Map<String, Object>> remoteRecording(@RequestBody Map<String, Object> body) {
+        String clientId = stringVal(body.get("client_id"));
+        String sessionId = stringVal(body.get("session_id"));
+        if (clientId == null || sessionId == null) {
+            throw new IllegalArgumentException("client_id and session_id required");
+        }
+        String contentB64 = stringVal(body.get("content_base64"));
+        if (contentB64 == null) {
+            throw new IllegalArgumentException("content_base64 required");
+        }
+        byte[] data = java.util.Base64.getDecoder().decode(contentB64);
+        String contentType = stringVal(body.get("content_type"));
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        return ApiResponse.ok(remoteService.uploadRecording(
+                device.tenantId(), device.deviceId(), clientId, sessionId, data,
+                contentType != null ? contentType : "application/octet-stream"));
+    }
+
     @PostMapping("/report/dlp-evidence")
     public ApiResponse<Map<String, Object>> reportDlpEvidence(@RequestBody Map<String, Object> body) {
         String clientId = stringVal(body.get("client_id"));

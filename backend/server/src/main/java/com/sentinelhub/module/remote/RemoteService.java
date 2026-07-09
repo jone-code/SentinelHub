@@ -4,8 +4,10 @@ import com.sentinelhub.module.audit.AuditService;
 import com.sentinelhub.module.device.DeviceRepository;
 import com.sentinelhub.module.identity.UserRepository;
 import com.sentinelhub.module.identity.domain.User;
+import com.sentinelhub.storage.MinioStorageService;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -19,13 +21,16 @@ public class RemoteService {
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final MinioStorageService minioStorageService;
 
     public RemoteService(RemoteRepository remoteRepository, DeviceRepository deviceRepository,
-                         UserRepository userRepository, AuditService auditService) {
+                         UserRepository userRepository, AuditService auditService,
+                         MinioStorageService minioStorageService) {
         this.remoteRepository = remoteRepository;
         this.deviceRepository = deviceRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
+        this.minioStorageService = minioStorageService;
     }
 
     public Map<String, Object> createSession(String tenantId, String userId, String deviceId,
@@ -137,6 +142,74 @@ public class RemoteService {
         return deviceRepository.findByAgentIdAny(clientId)
                 .flatMap(d -> remoteRepository.findActiveByDevice(d.id()).map(this::toClientSessionView))
                 .orElse(Map.of());
+    }
+
+    public Map<String, Object> postSignaling(String tenantId, String userId, String sessionId,
+                                             String role, String sdpType, String sdpPayload) {
+        remoteRepository.findById(tenantId, sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("session not found"));
+        remoteRepository.insertSignaling(tenantId, sessionId, role, sdpType, sdpPayload);
+        auditService.log(tenantId, "user", userId, "remote.signaling." + role, "remote_session", sessionId,
+                Map.of("sdp_type", sdpType), null);
+        return Map.of("session_id", sessionId, "role", role, "status", "stored");
+    }
+
+    public Map<String, Object> postClientSignaling(String tenantId, String deviceId, String clientId,
+                                                   String sessionId, String sdpType, String sdpPayload) {
+        Map<String, Object> session = remoteRepository.findById(tenantId, sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("session not found"));
+        if (!deviceId.equals(session.get("device_id").toString())) {
+            throw new IllegalArgumentException("session does not belong to device");
+        }
+        remoteRepository.insertSignaling(tenantId, sessionId, "client", sdpType, sdpPayload);
+        auditService.log(tenantId, "agent", clientId, "remote.signaling.client", "remote_session", sessionId,
+                Map.of("sdp_type", sdpType), null);
+        return Map.of("session_id", sessionId, "status", "stored");
+    }
+
+    public Map<String, Object> getSignalingForRole(String tenantId, String sessionId, String role) {
+        remoteRepository.findById(tenantId, sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("session not found"));
+        return remoteRepository.findLatestSignaling(sessionId, role)
+                .map(row -> Map.<String, Object>of(
+                        "role", row.get("role"),
+                        "sdp_type", row.get("sdp_type"),
+                        "sdp_payload", row.get("sdp_payload"),
+                        "created_at", row.get("created_at").toString()
+                ))
+                .orElse(Map.of());
+    }
+
+    public Map<String, Object> uploadRecording(String tenantId, String deviceId, String clientId,
+                                               String sessionId, byte[] data, String contentType) {
+        remoteRepository.findById(tenantId, sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("session not found"));
+        if (data.length > 5 * 1024 * 1024) {
+            throw new IllegalArgumentException("recording too large (max 5MB for demo)");
+        }
+        String objectKey = "remote-recordings/" + tenantId + "/" + sessionId + "/session.dat";
+        if (minioStorageService.isEnabled()) {
+            minioStorageService.putObject(objectKey, data, contentType);
+        }
+        Instant now = Instant.now();
+        remoteRepository.endSession(tenantId, sessionId, objectKey, now);
+        auditService.log(tenantId, "agent", clientId, "remote.recording.upload", "remote_session", sessionId,
+                Map.of("object_key", objectKey, "bytes", data.length), null);
+        return Map.of("session_id", sessionId, "recording_key", objectKey, "status", "stored");
+    }
+
+    public Map<String, Object> getRecordingUrl(String tenantId, String sessionId) {
+        Map<String, Object> session = remoteRepository.findById(tenantId, sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("session not found"));
+        String key = session.get("recording_key") != null ? session.get("recording_key").toString() : null;
+        if (key == null || key.isBlank()) {
+            return Map.of("available", false);
+        }
+        if (!minioStorageService.isEnabled()) {
+            return Map.of("available", true, "recording_key", key, "presigned_url", null);
+        }
+        String url = minioStorageService.presignedGetUrl(key, Duration.ofMinutes(15));
+        return Map.of("available", true, "recording_key", key, "presigned_url", url);
     }
 
     private Map<String, Object> toSessionView(Map<String, Object> row) {

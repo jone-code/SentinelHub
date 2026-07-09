@@ -91,4 +91,24 @@ public class RemoteRepository {
                         + "WHERE tenant_id=? AND id=? AND status IN ('pending','active')",
                 java.sql.Timestamp.from(when), tenantId, id);
     }
+
+    public void insertSignaling(String tenantId, String sessionId, String role, String sdpType, String sdpPayload) {
+        jdbc.update(
+                "INSERT INTO remote_signaling (id, tenant_id, session_id, role, sdp_type, sdp_payload) VALUES (?,?,?,?,?,?)",
+                UUID.randomUUID().toString(), tenantId, sessionId, role, sdpType, sdpPayload);
+    }
+
+    public Optional<Map<String, Object>> findLatestSignaling(String sessionId, String role) {
+        var list = jdbc.queryForList(
+                "SELECT * FROM remote_signaling WHERE session_id = ? AND role = ? ORDER BY created_at DESC LIMIT 1",
+                sessionId, role);
+        return list.stream().findFirst();
+    }
+
+    public List<Map<String, Object>> listSignaling(String tenantId, String sessionId) {
+        return jdbc.queryForList(
+                "SELECT role, sdp_type, sdp_payload, created_at FROM remote_signaling "
+                        + "WHERE tenant_id = ? AND session_id = ? ORDER BY created_at",
+                tenantId, sessionId);
+    }
 }

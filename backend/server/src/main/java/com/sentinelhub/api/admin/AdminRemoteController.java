@@ -64,6 +64,26 @@ public class AdminRemoteController {
         return ApiResponse.ok(remoteService.cancelSession(ctx.tenantId(), ctx.userId(), id));
     }
 
+    @PostMapping("/sessions/{id}/signal")
+    public ApiResponse<Map<String, Object>> postSignal(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        TenantContext ctx = requireContext();
+        return ApiResponse.ok(remoteService.postSignaling(
+                ctx.tenantId(), ctx.userId(), id,
+                "admin", body.getOrDefault("sdp_type", "offer"), body.get("sdp_payload")));
+    }
+
+    @GetMapping("/sessions/{id}/signaling")
+    public ApiResponse<Map<String, Object>> getClientSignal(@PathVariable String id) {
+        return ApiResponse.ok(remoteService.getSignalingForRole(requireTenant(), id, "client"));
+    }
+
+    @GetMapping("/sessions/{id}/recording-url")
+    public ApiResponse<Map<String, Object>> recordingUrl(@PathVariable String id) {
+        return ApiResponse.ok(remoteService.getRecordingUrl(requireTenant(), id));
+    }
+
     private static String requireTenant() {
         return requireContext().tenantId();
     }
