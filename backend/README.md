@@ -39,7 +39,14 @@ backend/
 
 需先启动 MySQL（`make dev-up`），默认连接 `localhost:3306/sentinelhub`。
 
-## 健康检查
+## 测试
+
+```bash
+./mvnw test          # 单元测试 + Testcontainers 集成测试（需 Docker）
+make test            # 含 client/service 测试
+```
+
+集成测试（`integration.*`）使用 Testcontainers MySQL；无 Docker 时自动跳过。
 
 ```bash
 curl http://localhost:8080/health
