@@ -118,4 +118,17 @@ public class RemoteRepository {
                         + "WHERE tenant_id = ? AND session_id = ? ORDER BY created_at",
                 tenantId, sessionId);
     }
+
+    public List<Map<String, Object>> listIceBySessionAndRole(String sessionId, String role) {
+        return jdbc.queryForList(
+                "SELECT id, sdp_payload, created_at FROM remote_signaling "
+                        + "WHERE session_id = ? AND role = ? AND sdp_type = 'ice' ORDER BY created_at",
+                sessionId, role);
+    }
+
+    public void insertIce(String tenantId, String sessionId, String role, String candidateJson) {
+        jdbc.update(
+                "INSERT INTO remote_signaling (id, tenant_id, session_id, role, sdp_type, sdp_payload) VALUES (?,?,?,?, 'ice', ?)",
+                UUID.randomUUID().toString(), tenantId, sessionId, role, candidateJson);
+    }
 }

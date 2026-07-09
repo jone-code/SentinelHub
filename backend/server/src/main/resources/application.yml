@@ -49,3 +49,10 @@ sentinelhub:
       base-url: ${AI_LLM_BASE_URL:https://api.openai.com/v1}
       api-key: ${AI_LLM_API_KEY:}
       model: ${AI_LLM_MODEL:gpt-4o-mini}
+  remote:
+    rtc:
+      stun-servers:
+        - stun:stun.l.google.com:19302
+      turn-url: ${REMOTE_TURN_URL:}
+      turn-username: ${REMOTE_TURN_USERNAME:}
+      turn-credential: ${REMOTE_TURN_CREDENTIAL:}

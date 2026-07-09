@@ -2,6 +2,9 @@ package com.sentinelhub.module.remote;
 
 import com.sentinelhub.module.audit.AuditService;
 import com.sentinelhub.module.device.DeviceRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sentinelhub.config.RemoteRtcProperties;
 import com.sentinelhub.module.identity.UserRepository;
 import com.sentinelhub.module.identity.domain.User;
 import com.sentinelhub.storage.MinioStorageService;
@@ -22,15 +25,20 @@ public class RemoteService {
     private final UserRepository userRepository;
     private final AuditService auditService;
     private final MinioStorageService minioStorageService;
+    private final RemoteRtcProperties remoteRtcProperties;
+    private final ObjectMapper objectMapper;
 
     public RemoteService(RemoteRepository remoteRepository, DeviceRepository deviceRepository,
                          UserRepository userRepository, AuditService auditService,
-                         MinioStorageService minioStorageService) {
+                         MinioStorageService minioStorageService, RemoteRtcProperties remoteRtcProperties,
+                         ObjectMapper objectMapper) {
         this.remoteRepository = remoteRepository;
         this.deviceRepository = deviceRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
         this.minioStorageService = minioStorageService;
+        this.remoteRtcProperties = remoteRtcProperties;
+        this.objectMapper = objectMapper;
     }
 
     public Map<String, Object> createSession(String tenantId, String userId, String deviceId,
@@ -178,6 +186,76 @@ public class RemoteService {
                         "created_at", row.get("created_at").toString()
                 ))
                 .orElse(Map.of());
+    }
+
+    public Map<String, Object> getRtcConfig() {
+        List<Map<String, Object>> iceServers = new ArrayList<>();
+        Map<String, Object> stunEntry = new LinkedHashMap<>();
+        stunEntry.put("urls", remoteRtcProperties.resolvedStunServers());
+        iceServers.add(stunEntry);
+        if (remoteRtcProperties.turnUrl() != null && !remoteRtcProperties.turnUrl().isBlank()) {
+            Map<String, Object> turn = new LinkedHashMap<>();
+            turn.put("urls", remoteRtcProperties.turnUrl());
+            if (remoteRtcProperties.turnUsername() != null) {
+                turn.put("username", remoteRtcProperties.turnUsername());
+            }
+            if (remoteRtcProperties.turnCredential() != null) {
+                turn.put("credential", remoteRtcProperties.turnCredential());
+            }
+            iceServers.add(turn);
+        }
+        return Map.of("ice_servers", iceServers);
+    }
+
+    public Map<String, Object> postIceCandidate(String tenantId, String userId, String sessionId,
+                                                String role, Map<String, Object> candidate) {
+        remoteRepository.findById(tenantId, sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("session not found"));
+        String json = toJson(candidate);
+        remoteRepository.insertIce(tenantId, sessionId, role, json);
+        return Map.of("status", "stored");
+    }
+
+    public Map<String, Object> postClientIce(String tenantId, String deviceId, String clientId,
+                                           String sessionId, Map<String, Object> candidate) {
+        Map<String, Object> session = remoteRepository.findById(tenantId, sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("session not found"));
+        if (!deviceId.equals(session.get("device_id").toString())) {
+            throw new IllegalArgumentException("session does not belong to device");
+        }
+        remoteRepository.insertIce(tenantId, sessionId, "client", toJson(candidate));
+        return Map.of("status", "stored");
+    }
+
+    public List<Map<String, Object>> listIceForRole(String tenantId, String sessionId, String role) {
+        remoteRepository.findById(tenantId, sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("session not found"));
+        return remoteRepository.listIceBySessionAndRole(sessionId, role).stream()
+                .map(row -> {
+                    Map<String, Object> view = new LinkedHashMap<>();
+                    view.put("id", row.get("id"));
+                    view.put("candidate", parseJsonString(row.get("sdp_payload").toString()));
+                    view.put("created_at", row.get("created_at").toString());
+                    return view;
+                })
+                .toList();
+    }
+
+    private String toJson(Map<String, Object> map) {
+        try {
+            return objectMapper.writeValueAsString(map);
+        } catch (JsonProcessingException e) {
+            return "{}";
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseJsonString(String json) {
+        try {
+            return objectMapper.readValue(json, Map.class);
+        } catch (Exception e) {
+            return Map.of();
+        }
     }
 
     public Map<String, Object> uploadRecording(String tenantId, String deviceId, String clientId,

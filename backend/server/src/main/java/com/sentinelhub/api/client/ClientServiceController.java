@@ -203,6 +203,36 @@ public class ClientServiceController {
         return ApiResponse.ok(remoteService.getSignalingForRole(device.tenantId(), sessionId, "admin"));
     }
 
+    @GetMapping("/remote/rtc-config")
+    public ApiResponse<Map<String, Object>> remoteRtcConfig() {
+        return ApiResponse.ok(remoteService.getRtcConfig());
+    }
+
+    @PostMapping("/remote/ice")
+    public ApiResponse<Map<String, Object>> remoteIce(@RequestBody Map<String, Object> body) {
+        String clientId = stringVal(body.get("client_id"));
+        String sessionId = stringVal(body.get("session_id"));
+        if (clientId == null || sessionId == null) {
+            throw new IllegalArgumentException("client_id and session_id required");
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> candidate = body.get("candidate") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m : body;
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        return ApiResponse.ok(remoteService.postClientIce(
+                device.tenantId(), device.deviceId(), clientId, sessionId, candidate));
+    }
+
+    @GetMapping("/remote/ice")
+    public ApiResponse<List<Map<String, Object>>> remoteIceList(
+            @RequestParam("client_id") String clientId,
+            @RequestParam("session_id") String sessionId) {
+        DeviceService.OptionalDevice device = deviceService.resolveClient(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("device not registered"));
+        return ApiResponse.ok(remoteService.listIceForRole(device.tenantId(), sessionId, "admin"));
+    }
+
     @PostMapping("/remote/recording")
     public ApiResponse<Map<String, Object>> remoteRecording(@RequestBody Map<String, Object> body) {
         String clientId = stringVal(body.get("client_id"));

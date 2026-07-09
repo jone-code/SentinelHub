@@ -84,6 +84,28 @@ public class AdminRemoteController {
         return ApiResponse.ok(remoteService.getRecordingUrl(requireTenant(), id));
     }
 
+    @GetMapping("/rtc-config")
+    public ApiResponse<Map<String, Object>> rtcConfig() {
+        return ApiResponse.ok(remoteService.getRtcConfig());
+    }
+
+    @PostMapping("/sessions/{id}/ice")
+    public ApiResponse<Map<String, Object>> postIce(
+            @PathVariable String id,
+            @RequestBody Map<String, Object> body) {
+        TenantContext ctx = requireContext();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> candidate = body.get("candidate") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m : body;
+        return ApiResponse.ok(remoteService.postIceCandidate(
+                ctx.tenantId(), ctx.userId(), id, "admin", candidate));
+    }
+
+    @GetMapping("/sessions/{id}/ice")
+    public ApiResponse<List<Map<String, Object>>> listClientIce(@PathVariable String id) {
+        return ApiResponse.ok(remoteService.listIceForRole(requireTenant(), id, "client"));
+    }
+
     private static String requireTenant() {
         return requireContext().tenantId();
     }

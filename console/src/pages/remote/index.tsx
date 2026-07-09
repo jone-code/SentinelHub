@@ -1,6 +1,7 @@
 import { Button, Card, Form, Input, Modal, Select, Table, Tag, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { api, ApiEnvelope, PageData } from '../../api/client';
+import { useRemoteWebRtc } from './webrtc';
 
 interface Device {
   id: string;
@@ -24,12 +25,6 @@ interface RemoteSession {
   created_at: string;
 }
 
-interface Signaling {
-  sdp_type?: string;
-  sdp_payload?: string;
-  created_at?: string;
-}
-
 const statusColors: Record<string, string> = {
   pending: 'orange',
   active: 'green',
@@ -43,9 +38,10 @@ export default function Remote() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [signalSession, setSignalSession] = useState<RemoteSession | null>(null);
-  const [sdpOffer, setSdpOffer] = useState('v=0\no=- 0 0 IN IP4 127.0.0.1\ns=SentinelHub Remote\n');
-  const [clientAnswer, setClientAnswer] = useState<Signaling>({});
+  const [connecting, setConnecting] = useState(false);
   const [form] = Form.useForm();
+
+  const { connect, cleanup, videoRef, connectionState } = useRemoteWebRtc(signalSession?.id ?? null);
 
   const load = () => {
     setLoading(true);
@@ -63,6 +59,10 @@ export default function Remote() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    return () => cleanup();
+  }, [cleanup]);
 
   const createSession = async () => {
     const values = await form.validateFields();
@@ -101,24 +101,25 @@ export default function Remote() {
     }
   };
 
-  const openSignaling = (session: RemoteSession) => {
+  const openWebRtc = (session: RemoteSession) => {
     setSignalSession(session);
-    setClientAnswer({});
-    fetchAnswer(session.id);
   };
 
-  const fetchAnswer = async (sessionId: string) => {
-    const res = await api.get<ApiEnvelope<Signaling>>(`/remote/sessions/${sessionId}/signaling`);
-    setClientAnswer(res.data.data ?? {});
+  const startConnection = async () => {
+    setConnecting(true);
+    try {
+      await connect();
+      message.success('WebRTC 连接已发起，等待客户端应答…');
+    } catch (err) {
+      message.error('WebRTC 连接失败');
+    } finally {
+      setConnecting(false);
+    }
   };
 
-  const sendOffer = async () => {
-    if (!signalSession) return;
-    await api.post(`/remote/sessions/${signalSession.id}/signal`, {
-      sdp_type: 'offer',
-      sdp_payload: sdpOffer,
-    });
-    message.success('SDP Offer 已发送');
+  const closeModal = () => {
+    cleanup();
+    setSignalSession(null);
   };
 
   return (
@@ -168,8 +169,8 @@ export default function Remote() {
               render: (_, row) => (
                 <>
                   {row.status === 'active' && (
-                    <Button type="link" onClick={() => openSignaling(row)}>
-                      WebRTC
+                    <Button type="link" onClick={() => openWebRtc(row)}>
+                      连接画面
                     </Button>
                   )}
                   {row.recording_key && (
@@ -195,33 +196,29 @@ export default function Remote() {
       </Card>
 
       <Modal
-        title={`WebRTC 信令 — ${signalSession?.hostname ?? ''}`}
+        title={`远程画面 — ${signalSession?.hostname ?? ''}`}
         open={Boolean(signalSession)}
-        onCancel={() => setSignalSession(null)}
-        footer={null}
-        width={720}
+        onCancel={closeModal}
+        footer={[
+          <Button key="connect" type="primary" loading={connecting} onClick={startConnection}>
+            建立 WebRTC 连接
+          </Button>,
+          <Button key="close" onClick={closeModal}>
+            关闭
+          </Button>,
+        ]}
+        width={800}
       >
-        <p style={{ color: '#666', marginBottom: 12 }}>
-          信令交换骨架：管理员发送 SDP Offer，客户端回报 Answer（媒体通道待实连）。
+        <p style={{ color: '#666' }}>
+          连接状态：<Tag>{connectionState}</Tag>
         </p>
-        <Form layout="vertical">
-          <Form.Item label="SDP Offer（管理员）">
-            <Input.TextArea rows={6} value={sdpOffer} onChange={(e) => setSdpOffer(e.target.value)} />
-          </Form.Item>
-          <Button type="primary" onClick={sendOffer} style={{ marginBottom: 16 }}>
-            发送 Offer
-          </Button>
-          <Form.Item label="SDP Answer（客户端）">
-            <Input.TextArea
-              rows={6}
-              readOnly
-              value={clientAnswer.sdp_payload ?? '等待客户端应答…'}
-            />
-          </Form.Item>
-          <Button onClick={() => signalSession && fetchAnswer(signalSession.id)}>
-            刷新 Answer
-          </Button>
-        </Form>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{ width: '100%', maxHeight: 400, background: '#000', borderRadius: 8 }}
+        />
       </Modal>
     </div>
   );
