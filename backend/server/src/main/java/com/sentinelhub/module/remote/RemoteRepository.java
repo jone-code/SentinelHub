@@ -92,6 +92,13 @@ public class RemoteRepository {
                 java.sql.Timestamp.from(when), tenantId, id);
     }
 
+    public int countActiveByTenant(String tenantId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM remote_sessions WHERE tenant_id = ? AND status = 'active'",
+                Integer.class, tenantId);
+        return count != null ? count : 0;
+    }
+
     public void insertSignaling(String tenantId, String sessionId, String role, String sdpType, String sdpPayload) {
         jdbc.update(
                 "INSERT INTO remote_signaling (id, tenant_id, session_id, role, sdp_type, sdp_payload) VALUES (?,?,?,?,?,?)",

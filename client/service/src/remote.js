@@ -27,6 +27,7 @@ export async function handleRemoteCommand(config, clientId, command) {
   );
   try {
     await uploadRecordingStub(config, clientId, sessionId);
+    await pollAndAnswerSignaling(config, clientId, sessionId);
   } catch (err) {
     console.warn('[sentinel-service] remote recording upload failed:', err.message);
   }
@@ -53,9 +54,6 @@ export async function endRemoteSession(config, clientId, sessionId, recordingKey
   });
 }
 
-/**
- * Upload session recording metadata to MinIO via backend.
- */
 export async function uploadRecordingStub(config, clientId, sessionId) {
   const metadata = JSON.stringify({
     session_id: sessionId,
@@ -74,4 +72,30 @@ export async function uploadRecordingStub(config, clientId, sessionId) {
       content_type: 'application/json',
     }),
   });
+}
+
+/**
+ * Poll admin SDP offer and post stub answer for WebRTC signaling handshake.
+ */
+export async function pollAndAnswerSignaling(config, clientId, sessionId) {
+  const pollUrl = `${config.serverUrl}/api/client/v1/service/remote/signal?client_id=${encodeURIComponent(clientId)}&session_id=${encodeURIComponent(sessionId)}`;
+  const pollRes = await fetch(pollUrl);
+  const pollBody = await pollRes.json();
+  const offer = pollBody?.data;
+  if (!offer?.sdp_payload) {
+    return;
+  }
+  const stubAnswer = `v=0\no=- 0 0 IN IP4 127.0.0.1\ns=SentinelHub Client\n${offer.sdp_payload.slice(0, 80)}`;
+  const signalUrl = `${config.serverUrl}/api/client/v1/service/remote/signal`;
+  await fetch(signalUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: clientId,
+      session_id: sessionId,
+      sdp_type: 'answer',
+      sdp_payload: stubAnswer,
+    }),
+  });
+  console.log(`[sentinel-service] remote signaling answer posted for ${sessionId}`);
 }

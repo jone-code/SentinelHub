@@ -13,6 +13,7 @@ struct ProcessInfo {
 #[derive(Serialize)]
 pub struct EnforceResult {
     pub checked_at: String,
+    pub driver_assisted: bool,
     pub violations: Vec<Violation>,
 }
 
@@ -56,6 +57,7 @@ pub fn run(policy_path: &Path) -> Result<EnforceResult, String> {
 
     Ok(EnforceResult {
         checked_at: chrono_now(),
+        driver_assisted: crate::driver::status().available,
         violations: violations.into_values().collect(),
     })
 }

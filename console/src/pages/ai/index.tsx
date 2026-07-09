@@ -30,6 +30,7 @@ export default function Ai() {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [llmSummary, setLlmSummary] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -51,8 +52,11 @@ export default function Ai() {
   const runAnalysis = async () => {
     setAnalyzing(true);
     try {
-      const res = await api.post<ApiEnvelope<{ insights_created: number }>>('/ai/analyze');
+      const res = await api.post<ApiEnvelope<{ insights_created: number; llm_summary?: string }>>('/ai/analyze');
       message.success(`分析完成，新增 ${res.data.data.insights_created} 条洞察`);
+      if (res.data.data.llm_summary) {
+        setLlmSummary(res.data.data.llm_summary);
+      }
       load();
     } finally {
       setAnalyzing(false);
@@ -86,6 +90,12 @@ export default function Ai() {
           </Card>
         </Col>
       </Row>
+
+      {llmSummary && (
+        <Card title="AI 摘要（LLM）" style={{ marginBottom: 24 }}>
+          <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{llmSummary}</p>
+        </Card>
+      )}
 
       <Card title="安全洞察（规则引擎）" loading={loading}>
         <Table

@@ -16,6 +16,7 @@ struct DlpRule {
 #[derive(Serialize)]
 pub struct DlpResult {
     pub checked_at: String,
+    pub driver_assisted: bool,
     pub violations: Vec<DlpViolation>,
 }
 
@@ -79,6 +80,7 @@ pub fn run(rules_path: &Path) -> Result<DlpResult, String> {
 
     Ok(DlpResult {
         checked_at: now_epoch(),
+        driver_assisted: crate::driver::status().available,
         violations,
     })
 }

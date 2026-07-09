@@ -43,3 +43,9 @@ sentinelhub:
     secret-key: ${MINIO_SECRET_KEY:sentinel123}
     bucket: ${MINIO_DLP_BUCKET:sentinel-dlp-evidence}
     region: ${MINIO_REGION:us-east-1}
+  ai:
+    llm:
+      enabled: ${AI_LLM_ENABLED:false}
+      base-url: ${AI_LLM_BASE_URL:https://api.openai.com/v1}
+      api-key: ${AI_LLM_API_KEY:}
+      model: ${AI_LLM_MODEL:gpt-4o-mini}

@@ -27,11 +27,11 @@
 | `module.mdm` | P3 | **配置描述文件/设备分配** |
 | `module.asset` | P3 | **租户级资产清单页** |
 | `module.remote` | P4 | **远程协助/WebRTC 信令/MinIO 录像** |
-| `module.ai` | P4 | **规则引擎安全洞察** |
-| 内核驱动 | P4 | **userspace daemon（Unix socket）** |
+| `module.ai` | P4 | **规则引擎 + 可选 LLM 摘要** |
+| 内核驱动 | P4 | **userspace daemon + enforce driver_assisted 标记** |
 
 ## 后续增强
 
-1. 内核 minifilter 实装（替换 userspace daemon 后端）
-2. LLM 接入 `module.ai`（当前为规则引擎）
-3. WebRTC 媒体通道实连
+1. 内核 minifilter 实装
+2. WebRTC 媒体通道实连（信令 UI 已就绪）
+3. LLM 配置：`AI_LLM_ENABLED=true` + `AI_LLM_API_KEY`

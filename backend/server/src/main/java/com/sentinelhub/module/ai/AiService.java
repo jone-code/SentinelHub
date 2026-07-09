@@ -17,11 +17,14 @@ public class AiService {
     private final AiRepository aiRepository;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
+    private final AiLlmClient aiLlmClient;
 
-    public AiService(AiRepository aiRepository, AuditService auditService, ObjectMapper objectMapper) {
+    public AiService(AiRepository aiRepository, AuditService auditService, ObjectMapper objectMapper,
+                     AiLlmClient aiLlmClient) {
         this.aiRepository = aiRepository;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
+        this.aiLlmClient = aiLlmClient;
     }
 
     public Map<String, Object> runAnalysis(String tenantId, String userId) {
@@ -32,10 +35,23 @@ public class AiService {
 
         auditService.log(tenantId, "user", userId, "ai.analysis.run", "tenant", tenantId,
                 Map.of("insights_created", created), null);
-        return Map.of(
-                "insights_created", created,
-                "open_insights", aiRepository.countByTenant(tenantId, "open")
-        );
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("insights_created", created);
+        result.put("open_insights", aiRepository.countByTenant(tenantId, "open"));
+        result.put("llm_enabled", true);
+
+        List<Map<String, Object>> open = listInsightsForAdmin(tenantId, "open", 1, 10).stream()
+                .filter(i -> !"llm_summary".equals(i.get("insight_type")))
+                .toList();
+        aiLlmClient.summarizeInsights(open).ifPresent(summary -> {
+            result.put("llm_summary", summary);
+            aiRepository.resolveOpenByType(tenantId, "llm_summary");
+            aiRepository.insertInsight(tenantId, "llm_summary", "info", "AI 分析摘要",
+                    summary, toJson(Map.of("source", "llm")), null);
+        });
+
+        return result;
     }
 
     public Map<String, Object> overviewForAdmin(String tenantId) {
