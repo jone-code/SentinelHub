@@ -49,7 +49,26 @@
 
 **依赖**：`ffmpeg`；Wayland 另需 grim 或 wf-recorder 或 pipewire 版 ffmpeg；目标机器需屏幕录制权限。
 
+## 生产级 TURN 部署
+
+跨 NAT 远程协助需 TURN 中继。见 `deploy/coturn/`：
+
+```bash
+cd deploy/coturn
+export TURN_STATIC_AUTH_SECRET="$(openssl rand -hex 32)"
+docker compose up -d
+```
+
+后端环境变量（与 coturn 共享密钥）：
+
+| 变量 | 说明 |
+|------|------|
+| `REMOTE_TURN_URL` | 逗号分隔，如 `turn:host:3478?transport=udp,turn:host:3478?transport=tcp` |
+| `REMOTE_TURN_SECRET` | TURN REST 密钥（与 `TURN_STATIC_AUTH_SECRET` 一致） |
+| `REMOTE_TURN_CREDENTIAL_TTL` | 临时凭证有效期（秒，默认 86400） |
+
+启用 `REMOTE_TURN_SECRET` 后，后端为每次 `rtc-config` 请求生成临时 username/credential。
+
 ## 后续增强
 
 1. 内核 minifilter 实装
-2. 生产级 TURN 部署（`REMOTE_TURN_*` 环境变量）

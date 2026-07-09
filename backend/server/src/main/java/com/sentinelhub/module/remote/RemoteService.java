@@ -189,22 +189,11 @@ public class RemoteService {
     }
 
     public Map<String, Object> getRtcConfig() {
-        List<Map<String, Object>> iceServers = new ArrayList<>();
-        Map<String, Object> stunEntry = new LinkedHashMap<>();
-        stunEntry.put("urls", remoteRtcProperties.resolvedStunServers());
-        iceServers.add(stunEntry);
-        if (remoteRtcProperties.turnUrl() != null && !remoteRtcProperties.turnUrl().isBlank()) {
-            Map<String, Object> turn = new LinkedHashMap<>();
-            turn.put("urls", remoteRtcProperties.turnUrl());
-            if (remoteRtcProperties.turnUsername() != null) {
-                turn.put("username", remoteRtcProperties.turnUsername());
-            }
-            if (remoteRtcProperties.turnCredential() != null) {
-                turn.put("credential", remoteRtcProperties.turnCredential());
-            }
-            iceServers.add(turn);
-        }
-        return Map.of("ice_servers", iceServers);
+        return Map.of(
+                "ice_servers", remoteRtcProperties.buildIceServers(),
+                "turn_enabled", remoteRtcProperties.hasTurn(),
+                "turn_ephemeral", remoteRtcProperties.usesEphemeralCredentials()
+        );
     }
 
     public Map<String, Object> postIceCandidate(String tenantId, String userId, String sessionId,

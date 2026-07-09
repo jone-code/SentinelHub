@@ -56,3 +56,5 @@ sentinelhub:
       turn-url: ${REMOTE_TURN_URL:}
       turn-username: ${REMOTE_TURN_USERNAME:}
       turn-credential: ${REMOTE_TURN_CREDENTIAL:}
+      turn-secret: ${REMOTE_TURN_SECRET:}
+      turn-credential-ttl-seconds: ${REMOTE_TURN_CREDENTIAL_TTL:86400}

@@ -39,6 +39,7 @@ export default function Remote() {
   const [creating, setCreating] = useState(false);
   const [signalSession, setSignalSession] = useState<RemoteSession | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [rtcInfo, setRtcInfo] = useState<{ turn_enabled?: boolean; turn_ephemeral?: boolean }>({});
   const [form] = Form.useForm();
 
   const { connect, cleanup, videoRef, connectionState } = useRemoteWebRtc(signalSession?.id ?? null);
@@ -63,6 +64,14 @@ export default function Remote() {
   useEffect(() => {
     return () => cleanup();
   }, [cleanup]);
+
+  useEffect(() => {
+    if (!signalSession) return;
+    api
+      .get<ApiEnvelope<{ turn_enabled?: boolean; turn_ephemeral?: boolean }>>('/remote/rtc-config')
+      .then((res) => setRtcInfo(res.data.data ?? {}))
+      .catch(() => setRtcInfo({}));
+  }, [signalSession]);
 
   const createSession = async () => {
     const values = await form.validateFields();
@@ -211,6 +220,15 @@ export default function Remote() {
       >
         <p style={{ color: '#666' }}>
           连接状态：<Tag>{connectionState}</Tag>
+          {' '}
+          TURN：
+          <Tag color={rtcInfo.turn_enabled ? 'green' : 'default'}>
+            {rtcInfo.turn_enabled
+              ? rtcInfo.turn_ephemeral
+                ? '已启用（临时凭证）'
+                : '已启用'
+              : '未配置'}
+          </Tag>
         </p>
         <video
           ref={videoRef}
