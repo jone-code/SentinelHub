@@ -30,8 +30,22 @@
 | `module.ai` | P4 | **规则引擎 + 可选 LLM 摘要** |
 | 内核驱动 | P4 | **userspace daemon + enforce driver_assisted 标记** |
 
+## 远程协助桌面采集
+
+客户端服务通过 **ffmpeg** 采集真实桌面画面并推送到 WebRTC：
+
+| 平台 | ffmpeg 输入 | 环境变量 |
+|------|-------------|----------|
+| Linux (X11) | `x11grab` | `DISPLAY`（默认 `:0.0`）、`REMOTE_CAPTURE_VIDEO_SIZE` |
+| macOS | `avfoundation` | `REMOTE_CAPTURE_MAC_DEVICE`（默认 `1:none`） |
+| Windows | `gdigrab` | `REMOTE_CAPTURE_WIN_INPUT`（默认 `desktop`） |
+
+通用：`REMOTE_CAPTURE_WIDTH` / `HEIGHT` / `FPS`；`REMOTE_CAPTURE_SYNTHETIC=true` 强制测试图案。
+
+**依赖**：目标机器需安装 `ffmpeg` 且具备屏幕录制权限。
+
 ## 后续增强
 
 1. 内核 minifilter 实装
-2. 真实桌面采集（替换 wrtc 合成视频）
+2. Wayland / PipeWire 原生采集（Linux 无 X11 时）
 3. 生产级 TURN 部署（`REMOTE_TURN_*` 环境变量）

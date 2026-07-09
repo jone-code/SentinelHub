@@ -1,6 +1,9 @@
 /**
  * WebRTC answerer for remote assist — uses @roamhq/wrtc in Node.js.
+ * Video: real desktop capture via ffmpeg, with synthetic test-pattern fallback.
  */
+
+import { createScreenCapture, probeScreenCapture } from './screen-capture.js';
 
 let wrtcModule = null;
 
@@ -36,43 +39,41 @@ function sleep(ms) {
 }
 
 /**
- * Start WebRTC peer as answerer with synthetic video feed.
- * @param {object} config
- * @param {string} clientId
- * @param {string} sessionId
+ * @param {import('./config.js').loadConfig extends Function ? ReturnType<import('./config.js').loadConfig> : any} config
  */
-export async function startRemoteWebRtc(config, clientId, sessionId) {
-  const offerSdp = await pollAdminOffer(config, clientId, sessionId, 15);
-  if (!offerSdp) {
-    console.log('[sentinel-service] remote WebRTC: no admin offer yet');
-    return null;
+function captureOptions(config) {
+  return {
+    width: config.remoteCaptureWidth ?? 1280,
+    height: config.remoteCaptureHeight ?? 720,
+    fps: config.remoteCaptureFps ?? 10,
+    forceSynthetic: config.remoteCaptureSynthetic === true,
+  };
+}
+
+/**
+ * Attach desktop or synthetic video track to peer connection.
+ * @returns {() => void} cleanup
+ */
+async function attachVideoTrack(pc, config) {
+  const wrtc = await loadWrtc();
+  const { nonstandard } = wrtc;
+  if (!nonstandard?.RTCVideoSource) {
+    throw new Error('wrtc RTCVideoSource not available');
   }
 
-  const wrtc = await loadWrtc();
-  const { RTCPeerConnection, RTCSessionDescription, nonstandard } = wrtc;
-  const iceServers = await fetchRtcConfig(config);
-  const pc = new RTCPeerConnection({ iceServers });
+  const opts = captureOptions(config);
+  const source = new nonstandard.RTCVideoSource();
+  const track = source.createTrack();
+  pc.addTrack(track);
 
-  const appliedAdminIce = new Set();
+  const cleanups = [];
 
-  pc.onicecandidate = async (event) => {
-    if (!event.candidate) return;
-    await fetch(`${config.serverUrl}/api/client/v1/service/remote/ice`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: clientId,
-        session_id: sessionId,
-        candidate: event.candidate.toJSON(),
-      }),
-    });
-  };
+  const useSynthetic = opts.forceSynthetic
+    ? true
+    : !(await probeScreenCapture(320, 240));
 
-  // Synthetic video source (test pattern)
-  if (nonstandard?.RTCVideoSource) {
-    const source = new nonstandard.RTCVideoSource();
-    const track = source.createTrack();
-    pc.addTrack(track);
+  if (useSynthetic) {
+    console.log('[sentinel-service] remote WebRTC: using synthetic video (capture unavailable)');
     let frame = 0;
     const timer = setInterval(() => {
       try {
@@ -92,12 +93,94 @@ export async function startRemoteWebRtc(config, clientId, sessionId) {
         clearInterval(timer);
       }
     }, 100);
-    pc.addEventListener('connectionstatechange', () => {
-      if (pc.connectionState === 'closed' || pc.connectionState === 'failed') {
-        clearInterval(timer);
-      }
+    cleanups.push(() => clearInterval(timer));
+  } else {
+    console.log(
+      `[sentinel-service] remote WebRTC: desktop capture ${opts.width}x${opts.height} @ ${opts.fps}fps`,
+    );
+    const capture = createScreenCapture({
+      width: opts.width,
+      height: opts.height,
+      fps: opts.fps,
+      onFrame: (frame) => {
+        try {
+          source.onFrame(frame);
+        } catch {
+          capture.stop();
+        }
+      },
+      onError: (err) => {
+        console.warn('[sentinel-service] screen capture error:', err.message);
+        capture.stop();
+      },
     });
+    cleanups.push(() => capture.stop());
+    try {
+      await capture.ready;
+    } catch (err) {
+      capture.stop();
+      throw err;
+    }
   }
+
+  return () => {
+    for (const fn of cleanups) fn();
+    try {
+      track.stop();
+    } catch {
+      // ignore
+    }
+  };
+}
+
+/**
+ * Start WebRTC peer as answerer with desktop screen feed.
+ * @param {object} config
+ * @param {string} clientId
+ * @param {string} sessionId
+ */
+export async function startRemoteWebRtc(config, clientId, sessionId) {
+  const offerSdp = await pollAdminOffer(config, clientId, sessionId, 15);
+  if (!offerSdp) {
+    console.log('[sentinel-service] remote WebRTC: no admin offer yet');
+    return null;
+  }
+
+  const wrtc = await loadWrtc();
+  const { RTCPeerConnection, RTCSessionDescription } = wrtc;
+  const iceServers = await fetchRtcConfig(config);
+  const pc = new RTCPeerConnection({ iceServers });
+
+  const appliedAdminIce = new Set();
+  let stopVideo = () => {};
+  /** @type {ReturnType<typeof setInterval> | null} */
+  let icePoll = null;
+
+  pc.onicecandidate = async (event) => {
+    if (!event.candidate) return;
+    await fetch(`${config.serverUrl}/api/client/v1/service/remote/ice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: clientId,
+        session_id: sessionId,
+        candidate: event.candidate.toJSON(),
+      }),
+    });
+  };
+
+  stopVideo = await attachVideoTrack(pc, config);
+
+  const teardown = () => {
+    stopVideo();
+    if (icePoll) clearInterval(icePoll);
+  };
+
+  pc.addEventListener('connectionstatechange', () => {
+    if (pc.connectionState === 'closed' || pc.connectionState === 'failed') {
+      teardown();
+    }
+  });
 
   await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: offerSdp }));
 
@@ -115,8 +198,7 @@ export async function startRemoteWebRtc(config, clientId, sessionId) {
     }),
   });
 
-  // Poll admin ICE candidates
-  const icePoll = setInterval(async () => {
+  icePoll = setInterval(async () => {
     if (pc.connectionState === 'connected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
       clearInterval(icePoll);
       return;
@@ -141,5 +223,5 @@ export async function startRemoteWebRtc(config, clientId, sessionId) {
   }, 2000);
 
   console.log(`[sentinel-service] remote WebRTC answer posted for ${sessionId}`);
-  return { connection: pc, sessionId };
+  return { connection: pc, sessionId, stop: teardown };
 }
