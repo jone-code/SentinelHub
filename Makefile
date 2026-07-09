@@ -29,3 +29,4 @@ client-native-build:
 
 test:
 	cd backend && ./mvnw test
+	cd client/service && npm test
