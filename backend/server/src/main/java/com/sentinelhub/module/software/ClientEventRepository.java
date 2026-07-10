@@ -3,6 +3,7 @@ package com.sentinelhub.module.software;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,16 +24,41 @@ public class ClientEventRepository {
                 UUID.randomUUID().toString(), tenantId, deviceId, eventType, severity, detailJson);
     }
 
-    public List<Map<String, Object>> listByTenant(String tenantId, int limit, int offset) {
-        return jdbc.queryForList(
+    public List<Map<String, Object>> listByTenant(String tenantId, int limit, int offset,
+                                                   String eventTypeFilter, String severityFilter) {
+        StringBuilder sql = new StringBuilder(
                 "SELECT e.id, e.event_type, e.severity, e.detail, e.created_at, d.hostname, d.agent_id "
                         + "FROM client_events e JOIN devices d ON d.id = e.device_id "
-                        + "WHERE e.tenant_id = ? ORDER BY e.created_at DESC LIMIT ? OFFSET ?",
-                tenantId, limit, offset);
+                        + "WHERE e.tenant_id = ?");
+        List<Object> args = new ArrayList<>();
+        args.add(tenantId);
+        if (eventTypeFilter != null && !eventTypeFilter.isBlank()) {
+            sql.append(" AND e.event_type LIKE ?");
+            args.add("%" + eventTypeFilter + "%");
+        }
+        if (severityFilter != null && !severityFilter.isBlank()) {
+            sql.append(" AND e.severity = ?");
+            args.add(severityFilter);
+        }
+        sql.append(" ORDER BY e.created_at DESC LIMIT ? OFFSET ?");
+        args.add(limit);
+        args.add(offset);
+        return jdbc.queryForList(sql.toString(), args.toArray());
     }
 
-    public int countByTenant(String tenantId) {
-        Integer c = jdbc.queryForObject("SELECT COUNT(*) FROM client_events WHERE tenant_id = ?", Integer.class, tenantId);
+    public int countByTenant(String tenantId, String eventTypeFilter, String severityFilter) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM client_events WHERE tenant_id = ?");
+        List<Object> args = new ArrayList<>();
+        args.add(tenantId);
+        if (eventTypeFilter != null && !eventTypeFilter.isBlank()) {
+            sql.append(" AND event_type LIKE ?");
+            args.add("%" + eventTypeFilter + "%");
+        }
+        if (severityFilter != null && !severityFilter.isBlank()) {
+            sql.append(" AND severity = ?");
+            args.add(severityFilter);
+        }
+        Integer c = jdbc.queryForObject(sql.toString(), Integer.class, args.toArray());
         return c != null ? c : 0;
     }
 

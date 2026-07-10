@@ -1,7 +1,9 @@
 //! Userspace driver daemon — Unix socket JSON-line IPC + kernel module bridge.
 
+mod bpf_sync;
 mod fanotify;
 mod kernel;
+mod policy_parse;
 mod process_block;
 
 use serde::{Deserialize, Serialize};
@@ -146,6 +148,10 @@ fn apply_policy(policy: &str, kernel_loaded: bool) -> Result<serde_json::Value, 
     }
     let fanotify = restart_fanotify(policy);
     let process_block = restart_process_block(policy);
+    #[cfg(target_os = "linux")]
+    let bpf_sync = bpf_sync::sync_from_policy(policy);
+    #[cfg(not(target_os = "linux"))]
+    let bpf_sync: Result<usize, String> = Err("BPF sync requires Linux".into());
     Ok(serde_json::json!({
         "ok": true,
         "kernel_loaded": kernel_loaded,
@@ -153,7 +159,10 @@ fn apply_policy(policy: &str, kernel_loaded: bool) -> Result<serde_json::Value, 
         "fanotify": fanotify.is_ok(),
         "fanotify_warning": fanotify.err(),
         "process_block": process_block.is_ok(),
-        "process_block_warning": process_block.err()
+        "process_block_warning": process_block.err(),
+        "bpf_sync": bpf_sync.is_ok(),
+        "bpf_entries": bpf_sync.as_ref().copied().unwrap_or(0),
+        "bpf_warning": bpf_sync.err().map(|e| e.to_string())
     }))
 }
 

@@ -69,19 +69,17 @@ docker compose up -d
 
 启用 `REMOTE_TURN_SECRET` 后，后端为每次 `rtc-config` 请求生成临时 username/credential。
 
-## 内核驱动（phase 4）
+## 内核驱动（phase 5）
 
 | 组件 | 能力 |
 |------|------|
-| sentinel-native | `driver events --json` — 拉取 daemon 监视器事件 + 排空 kmod ring |
-| Node service | `runDriverEventDrain()` 每 3s 轮询，经 `POST /report/events` 写入审计 |
-| 事件类型 | `driver.file_open/blocked`、`driver.process_exec/blocked` |
-| 后端 | 复用 `SoftwareService.ingestEvents` → `client_events` + `audit_logs` |
-
-配置：`CLIENT_DRIVER_EVENT_INTERVAL_SEC`（默认 3）。
+| Windows minifilter | `IRP_MJ_WRITE` USB 可移动介质写入阻断 |
+| Linux BPF | `apply_policy` 自动同步 `blocked_comms` map（bpftool） |
+| ClickHouse | 审计冷存储双写（`AUDIT_CH_ENABLED=true`） |
+| 管理台 | 安全事件/审计日志分页、驱动事件筛选、冷热存储切换 |
 
 ## 后续增强
 
-1. Windows USB 写入阻断
-2. BPF map 与策略 JSON 自动同步
-3. ClickHouse 审计冷存储
+1. Windows 用户态 minifilter 策略推送客户端
+2. NATS 异步审计管道
+3. ClickHouse client_events 冷归档

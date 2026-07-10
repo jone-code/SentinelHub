@@ -25,10 +25,12 @@ public class AdminAuditController {
     @GetMapping("/logs")
     public ApiResponse<PageResponse<Map<String, Object>>> listLogs(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(name = "page_size", defaultValue = "20") int pageSize) {
+            @RequestParam(name = "page_size", defaultValue = "20") int pageSize,
+            @RequestParam(required = false) String action,
+            @RequestParam(defaultValue = "hot") String storage) {
         String tenantId = requireTenant();
-        List<Map<String, Object>> items = auditService.listForAdmin(tenantId, page, pageSize);
-        int total = auditService.count(tenantId);
+        List<Map<String, Object>> items = auditService.listForAdmin(tenantId, page, pageSize, action, storage);
+        int total = auditService.count(tenantId, action, storage);
         return ApiResponse.ok(new PageResponse<>(items, total, page, pageSize));
     }
 

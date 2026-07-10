@@ -11,6 +11,7 @@ static KSPIN_LOCK gPolicyLock;
 
 static const FLT_OPERATION_REGISTRATION callbacks[] = {
     { IRP_MJ_CREATE, 0, SentinelPreCreate, NULL },
+    { IRP_MJ_WRITE, 0, SentinelPreWrite, NULL },
     { IRP_MJ_OPERATION_END }
 };
 
@@ -86,7 +87,7 @@ static NTSTATUS SentinelMessageNotify(
     }
 
     if (OutputBuffer && OutputBufferLength >= sizeof(ULONG)) {
-        *(PULONG)OutputBuffer = NT_SUCCESS(status) ? gPolicyCache.RuleCount : 0;
+        *(PULONG)OutputBuffer = gPolicyCache.RuleCount + (gPolicyCache.UsbBlockWrites ? 1 : 0);
         *ReturnOutputBufferLength = sizeof(ULONG);
     } else {
         *ReturnOutputBufferLength = 0;
@@ -238,15 +239,65 @@ FLT_PREOP_CALLBACK_STATUS SentinelPreCreate(
     return FLT_PREOP_SUCCESS_NO_CALLBACK;
 }
 
+FLT_PREOP_CALLBACK_STATUS SentinelPreWrite(
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _Flt_CompletionContext_Outptr_ PVOID *CompletionContext)
+{
+    KIRQL oldIrql;
+    BOOLEAN usbBlock = FALSE;
+    BOOLEAN removable = FALSE;
+
+    UNREFERENCED_PARAMETER(CompletionContext);
+
+    if (!FLT_IS_IRP_OPERATION(Data)) {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    KeAcquireSpinLock(&gPolicyLock, &oldIrql);
+    usbBlock = gPolicyCache.UsbBlockWrites;
+    KeReleaseSpinLock(&gPolicyLock, oldIrql);
+
+    if (!usbBlock) {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    removable = SentinelVolumeIsRemovable(FltObjects);
+    if (removable) {
+        Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+        Data->IoStatus.Information = 0;
+        return FLT_PREOP_COMPLETE;
+    }
+
+    return FLT_PREOP_SUCCESS_NO_CALLBACK;
+}
+
+BOOLEAN SentinelVolumeIsRemovable(_In_ PCFLT_RELATED_OBJECTS FltObjects)
+{
+    NTSTATUS status;
+    PDEVICE_OBJECT diskDeviceObject = NULL;
+
+    status = FltGetDiskDeviceObject(FltObjects->Volume, &diskDeviceObject);
+    if (!NT_SUCCESS(status) || diskDeviceObject == NULL) {
+        return FALSE;
+    }
+
+    if (diskDeviceObject->Characteristics & FILE_REMOVABLE_MEDIA) {
+        ObDereferenceObject(diskDeviceObject);
+        return TRUE;
+    }
+
+    ObDereferenceObject(diskDeviceObject);
+    return FALSE;
+}
+
 NTSTATUS SentinelUpdatePolicyCache(_In_reads_bytes_(Length) PUCHAR Data, _In_ ULONG Length)
 {
     SENTINEL_POLICY_CACHE parsed;
     KIRQL oldIrql;
 
     RtlZeroMemory(&parsed, sizeof(parsed));
-    if (!SentinelParsePolicyPatterns(Data, Length, &parsed)) {
-        return STATUS_INVALID_PARAMETER;
-    }
+    SentinelParsePolicyPatterns(Data, Length, &parsed);
 
     KeAcquireSpinLock(&gPolicyLock, &oldIrql);
     gPolicyCache = parsed;
@@ -295,6 +346,20 @@ BOOLEAN SentinelParsePolicyPatterns(
             break;
         }
         channel++;
+        if (SentinelStrContains(channel, "usb")) {
+            action = strstr(channel, "\"action\"");
+            if (action) {
+                action = strstr(action, "\"");
+                if (action) {
+                    action++;
+                    if (SentinelStrContains(action, "block")) {
+                        Cache->UsbBlockWrites = TRUE;
+                    }
+                }
+            }
+            cursor = channel + 1;
+            continue;
+        }
         if (!SentinelStrContains(channel, "sensitive_path") &&
             !SentinelStrContains(channel, "file_hook")) {
             cursor = channel + 1;
@@ -362,7 +427,7 @@ BOOLEAN SentinelParsePolicyPatterns(
     }
 
     ExFreePoolWithTag(buf, SENTINEL_FILTER_TAG);
-    return Cache->RuleCount > 0;
+    return Cache->RuleCount > 0 || Cache->UsbBlockWrites;
 }
 
 BOOLEAN SentinelPathMatchesRule(_In_ PCUNICODE_STRING Path, _In_ PCWSTR Pattern)
