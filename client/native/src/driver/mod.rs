@@ -4,7 +4,15 @@
 mod kernel;
 
 use serde::Serialize;
+use serde_json::Value;
 use std::time::Duration;
+
+#[derive(Serialize, Clone, Default)]
+pub struct DriverEventBatch {
+    pub file_events: Vec<Value>,
+    pub process_events: Vec<Value>,
+    pub kernel_events: Vec<Value>,
+}
 
 #[derive(Serialize, Clone)]
 pub struct DriverStatus {
@@ -90,52 +98,74 @@ pub fn push_policy(payload: &str) -> bool {
     false
 }
 
+/// Fetch daemon watcher events and drain kernel ring buffer.
+pub fn collect_events(limit: usize) -> DriverEventBatch {
+    #[cfg(unix)]
+    {
+        let mut batch = DriverEventBatch::default();
+        if let Some(resp) = daemon_request(&serde_json::json!({
+            "cmd": "get_events",
+            "limit": limit
+        })) {
+            if let Some(arr) = resp.get("file_events").and_then(|v| v.as_array()) {
+                batch.file_events = arr.clone();
+            }
+            if let Some(arr) = resp.get("process_events").and_then(|v| v.as_array()) {
+                batch.process_events = arr.clone();
+            }
+        }
+        if let Some(resp) = daemon_request(&serde_json::json!({
+            "cmd": "drain_kernel_events"
+        })) {
+            if let Some(arr) = resp.get("events").and_then(|v| v.as_array()) {
+                batch.kernel_events = arr.clone();
+            }
+        }
+        return batch;
+    }
+    #[allow(unreachable_code)]
+    DriverEventBatch::default()
+}
+
 #[cfg(unix)]
-fn push_policy_to_daemon(payload: &str) -> bool {
+fn daemon_request(request: &Value) -> Option<Value> {
     use std::io::{Read, Write};
     use std::os::unix::net::UnixStream;
 
     let path = default_socket_path();
-    let mut stream = match UnixStream::connect(&path) {
-        Ok(s) => s,
-        Err(_) => return false,
-    };
+    let mut stream = UnixStream::connect(&path).ok()?;
     stream
-        .set_read_timeout(Some(Duration::from_millis(1000)))
+        .set_read_timeout(Some(Duration::from_millis(1500)))
         .ok();
     stream
-        .set_write_timeout(Some(Duration::from_millis(1000)))
+        .set_write_timeout(Some(Duration::from_millis(1500)))
         .ok();
 
-    let request = serde_json::json!({
+    let line = format!("{request}\n");
+    stream.write_all(line.as_bytes()).ok()?;
+    stream.flush().ok()?;
+
+    let mut buf = vec![0u8; 65536];
+    let n = stream.read(&mut buf).ok()?;
+    if n == 0 {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&buf[..n]);
+    let response_line = text.lines().next()?;
+    let value: Value = serde_json::from_str(response_line).ok()?;
+    if !value.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+        return None;
+    }
+    Some(value)
+}
+
+#[cfg(unix)]
+fn push_policy_to_daemon(payload: &str) -> bool {
+    daemon_request(&serde_json::json!({
         "cmd": "set_policy",
         "policy": payload
-    });
-    if stream
-        .write_all(format!("{request}\n").to_string().as_bytes())
-        .is_err()
-    {
-        return false;
-    }
-    if stream.flush().is_err() {
-        return false;
-    }
-
-    let mut buf = vec![0u8; 4096];
-    let n = match stream.read(&mut buf) {
-        Ok(n) if n > 0 => n,
-        _ => return false,
-    };
-    let text = String::from_utf8_lossy(&buf[..n]);
-    let line = match text.lines().next() {
-        Some(l) => l,
-        None => return false,
-    };
-    let value: serde_json::Value = match serde_json::from_str(line) {
-        Ok(v) => v,
-        Err(_) => return false,
-    };
-    value.get("ok").and_then(|v| v.as_bool()).unwrap_or(false)
+    }))
+    .is_some()
 }
 
 #[cfg(not(unix))]

@@ -76,3 +76,20 @@ export async function queryDriverViaNative(nativeBin) {
     return null;
   }
 }
+
+/**
+ * Fetch driver watcher + kernel ring events via native sidecar.
+ * @param {string | null} nativeBin
+ * @param {number} [limit]
+ */
+export async function queryDriverEvents(nativeBin, limit = 50) {
+  if (!nativeBin || process.platform === 'win32') {
+    return null;
+  }
+  try {
+    return await runNative(nativeBin, ['driver', 'events', '--limit', String(limit), '--json']);
+  } catch (err) {
+    console.warn('[sentinel-service] driver events failed:', err.message);
+    return null;
+  }
+}
