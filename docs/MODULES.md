@@ -28,7 +28,7 @@
 | `module.asset` | P3 | **租户级资产清单页** |
 | `module.remote` | P4 | **远程协助/WebRTC 媒体/MinIO 录像** |
 | `module.ai` | P4 | **规则引擎 + 可选 LLM 摘要** |
-| 内核驱动 | P4 | **userspace daemon + enforce driver_assisted 标记** |
+| 内核驱动 | P4 | **Linux kmod phase 1 + Windows minifilter skeleton + policy ioctl** |
 
 ## 远程协助桌面采集
 
@@ -69,6 +69,20 @@ docker compose up -d
 
 启用 `REMOTE_TURN_SECRET` 后，后端为每次 `rtc-config` 请求生成临时 username/credential。
 
+## 内核驱动（phase 1）
+
+| 平台 | 路径 | 能力 |
+|------|------|------|
+| Linux | `client/native/driver/linux/sentinel-kmod/` | `/dev/sentinelhub` ioctl 策略通道 |
+| Windows | `client/native/driver/windows/minifilter/` | minifilter 骨架（WDK 编译） |
+| 共用 | `client/native/driver/include/sentinel_ioctl.h` | ioctl 定义 |
+
+`sentinel-native enforce` 在检测到内核模块时自动 `push_policy` 到内核。
+
+详见 `client/native/driver/README.md`。
+
 ## 后续增强
 
-1. 内核 minifilter 实装
+1. Linux fanotify / LSM BPF 文件拦截
+2. Windows minifilter 策略通信端口 + 路径阻断
+3. 内核事件 ring buffer 回传用户态
