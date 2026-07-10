@@ -45,13 +45,14 @@ public class SoftwareService {
         zerotrustService.recomputeForDevice(tenantId, deviceId);
     }
 
-    public List<Map<String, Object>> listEventsForAdmin(String tenantId, int page, int pageSize) {
+    public List<Map<String, Object>> listEventsForAdmin(String tenantId, int page, int pageSize,
+                                                        String eventTypeFilter, String severityFilter) {
         int offset = Math.max(0, (page - 1) * pageSize);
-        return eventRepository.listByTenant(tenantId, pageSize, offset);
+        return eventRepository.listByTenant(tenantId, pageSize, offset, eventTypeFilter, severityFilter);
     }
 
-    public int countEvents(String tenantId) {
-        return eventRepository.countByTenant(tenantId);
+    public int countEvents(String tenantId, String eventTypeFilter, String severityFilter) {
+        return eventRepository.countByTenant(tenantId, eventTypeFilter, severityFilter);
     }
 
     public int countRecentAlerts(String tenantId) {

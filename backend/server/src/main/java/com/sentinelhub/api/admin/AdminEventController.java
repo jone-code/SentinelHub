@@ -25,13 +25,16 @@ public class AdminEventController {
     @GetMapping
     public ApiResponse<PageResponse<Map<String, Object>>> list(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(name = "page_size", defaultValue = "20") int pageSize) {
+            @RequestParam(name = "page_size", defaultValue = "20") int pageSize,
+            @RequestParam(name = "event_type", required = false) String eventType,
+            @RequestParam(required = false) String severity) {
         TenantContext ctx = TenantContext.get();
         if (ctx == null || ctx.tenantId() == null) {
             throw new IllegalArgumentException("unauthorized");
         }
-        List<Map<String, Object>> items = softwareService.listEventsForAdmin(ctx.tenantId(), page, pageSize);
-        int total = softwareService.countEvents(ctx.tenantId());
+        List<Map<String, Object>> items = softwareService.listEventsForAdmin(
+                ctx.tenantId(), page, pageSize, eventType, severity);
+        int total = softwareService.countEvents(ctx.tenantId(), eventType, severity);
         return ApiResponse.ok(new PageResponse<>(items, total, page, pageSize));
     }
 }

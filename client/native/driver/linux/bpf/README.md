@@ -1,4 +1,4 @@
-# SentinelHub LSM BPF (Phase 3)
+# SentinelHub LSM BPF (Phase 3/5)
 
 Optional kernel-side process execution blocking via `bprm_check_security` LSM hook.
 
@@ -21,13 +21,21 @@ make
 sudo ./load.sh
 ```
 
-## Populate blocked process names
+Map pinned at `/sys/fs/bpf/sentinel_blocked_comms`.
+
+## Auto-sync (Phase 5)
+
+When BPF is loaded, `sentinel-driver` `set_policy` automatically updates the map from:
+
+- DLP `process_block` rules with `action: block`
+- Software policy blacklist with `action: block`
+
+Manual update example:
 
 ```bash
-# Example: block "nc" (netcat)
-echo -n "nc" | sudo bpftool map update pinned /sys/fs/bpf/blocked_comms key -
+echo -n "nc" | sudo bpftool map update pinned /sys/fs/bpf/sentinel_blocked_comms key -
 ```
 
 ## Fallback
 
-When BPF is unavailable, `sentinel-driver` runs a userspace `/proc` watcher (`process_block.rs`) that terminates matching processes and pushes events to the kernel ring.
+When BPF is unavailable, `sentinel-driver` runs a userspace `/proc` watcher (`process_block.rs`).

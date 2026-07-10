@@ -31,6 +31,7 @@ typedef struct _SENTINEL_POLICY_RULE {
 
 typedef struct _SENTINEL_POLICY_CACHE {
     ULONG RuleCount;
+    BOOLEAN UsbBlockWrites;
     SENTINEL_POLICY_RULE Rules[SENTINEL_MAX_RULES];
 } SENTINEL_POLICY_CACHE, *PSENTINEL_POLICY_CACHE;
 
@@ -54,6 +55,13 @@ FLT_PREOP_CALLBACK_STATUS SentinelPreCreate(
     _Inout_ PFLT_CALLBACK_DATA Data,
     _In_ PCFLT_RELATED_OBJECTS FltObjects,
     _Flt_CompletionContext_Outptr_ PVOID *CompletionContext);
+
+FLT_PREOP_CALLBACK_STATUS SentinelPreWrite(
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _Flt_CompletionContext_Outptr_ PVOID *CompletionContext);
+
+BOOLEAN SentinelVolumeIsRemovable(_In_ PCFLT_RELATED_OBJECTS FltObjects);
 
 NTSTATUS SentinelUpdatePolicyCache(
     _In_reads_bytes_(Length) PUCHAR Data,

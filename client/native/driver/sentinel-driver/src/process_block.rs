@@ -8,6 +8,7 @@ mod linux {
         path_to_bytes, push_event, SentinelEvent, SENTINEL_EVENT_PROCESS_BLOCK,
         SENTINEL_EVENT_PROCESS_EXEC,
     };
+    use crate::policy_parse::{parse_process_rules, ProcessRule};
     use serde::Serialize;
     use std::collections::HashSet;
     use std::fs;
@@ -16,12 +17,6 @@ mod linux {
     use std::sync::{Arc, Mutex};
     use std::thread::{self, JoinHandle};
     use std::time::Duration;
-
-    #[derive(Clone)]
-    struct ProcessRule {
-        name: String,
-        action: String,
-    }
 
     #[derive(Clone, Serialize)]
     pub struct ProcessEvent {
@@ -175,70 +170,6 @@ mod linux {
             .to_lowercase()
             .trim_end_matches(".exe")
             .to_string()
-    }
-
-    fn parse_process_rules(policy_json: &str) -> Vec<ProcessRule> {
-        let value: serde_json::Value = match serde_json::from_str(policy_json) {
-            Ok(v) => v,
-            Err(_) => return vec![],
-        };
-
-        let mut rules = Vec::new();
-
-        // DLP rules: channel == "process_block"
-        let items = if let Some(arr) = value.as_array() {
-            arr.clone()
-        } else if let Some(rules_arr) = value.get("rules").and_then(|r| r.as_array()) {
-            rules_arr.clone()
-        } else {
-            vec![]
-        };
-
-        for item in items {
-            let channel = item.get("channel").and_then(|c| c.as_str()).unwrap_or("");
-            if channel != "process_block" {
-                continue;
-            }
-            let action = item
-                .get("action")
-                .and_then(|a| a.as_str())
-                .unwrap_or("alert")
-                .to_string();
-            if let Some(patterns) = item.get("patterns").and_then(|p| p.as_array()) {
-                for p in patterns {
-                    if let Some(s) = p.as_str() {
-                        rules.push(ProcessRule {
-                            name: s.to_string(),
-                            action: action.clone(),
-                        });
-                    }
-                }
-            }
-        }
-
-        // Software policy blacklist
-        let blacklist = value
-            .pointer("/rules/software/config/blacklist")
-            .or_else(|| value.pointer("/software/config/blacklist"))
-            .and_then(|v| v.as_array());
-        let sw_action = value
-            .pointer("/rules/software/config/action")
-            .or_else(|| value.pointer("/software/config/action"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("alert")
-            .to_string();
-        if let Some(arr) = blacklist {
-            for item in arr {
-                if let Some(s) = item.as_str() {
-                    rules.push(ProcessRule {
-                        name: s.to_string(),
-                        action: sw_action.clone(),
-                    });
-                }
-            }
-        }
-
-        rules
     }
 }
 

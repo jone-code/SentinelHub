@@ -90,5 +90,5 @@ Node service polls this every `CLIENT_DRIVER_EVENT_INTERVAL_SEC` (default 3) and
 | **1** | Char device + policy ioctl | Minifilter register + pre-create stub |
 | **2** | fanotify file hooks + kernel event ring | FltCreateCommunicationPort skeleton |
 | **3** | process_block watcher + LSM BPF skeleton | Policy cache + PreCreate path deny |
-| **4 (current)** | Event stream → Node service → backend audit | (userspace client TBD) |
-| 5 | BPF map auto-sync | USB write blocking |
+| **4** | Event stream → Node service → backend audit | (userspace client TBD) |
+| **5 (current)** | BPF map auto-sync from policy | USB write blocking (`IRP_MJ_WRITE`) |

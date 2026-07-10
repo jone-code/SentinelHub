@@ -43,7 +43,8 @@ On `SET_POLICY`, the driver parses `sensitive_path` / `file_hook` rules with `ac
 | 1 | Filter load/unload, pre-create pass-through |
 | 2 | Communication port skeleton |
 | 3 | Policy cache + path deny (current) |
-| 4 | USB write blocking, process create callback |
+| 4 | USB write blocking (`IRP_MJ_WRITE`, removable volumes) |
+| 5 | Process create callback driver |
 
 ## Testing
 
