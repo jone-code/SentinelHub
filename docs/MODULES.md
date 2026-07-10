@@ -69,20 +69,18 @@ docker compose up -d
 
 启用 `REMOTE_TURN_SECRET` 后，后端为每次 `rtc-config` 请求生成临时 username/credential。
 
-## 内核驱动（phase 1）
+## 内核驱动（phase 2）
 
-| 平台 | 路径 | 能力 |
-|------|------|------|
-| Linux | `client/native/driver/linux/sentinel-kmod/` | `/dev/sentinelhub` ioctl 策略通道 |
-| Windows | `client/native/driver/windows/minifilter/` | minifilter 骨架（WDK 编译） |
-| 共用 | `client/native/driver/include/sentinel_ioctl.h` | ioctl 定义 |
+| 平台 | 能力 |
+|------|------|
+| Linux kmod | 事件 ring buffer（`PUSH_EVENT` / `GET_EVENT` ioctl） |
+| Linux daemon | **fanotify** 文件打开钩子（`sensitive_path` / `file_hook` 规则，`block` 动作拒绝访问） |
+| Windows | minifilter **通信端口**骨架（`\\SentinelHubPort`） |
 
-`sentinel-native enforce` 在检测到内核模块时自动 `push_policy` 到内核。
-
-详见 `client/native/driver/README.md`。
+Daemon IPC 新增：`get_events`、`drain_kernel_events`。
 
 ## 后续增强
 
-1. Linux fanotify / LSM BPF 文件拦截
-2. Windows minifilter 策略通信端口 + 路径阻断
-3. 内核事件 ring buffer 回传用户态
+1. Linux LSM BPF 进程拦截
+2. Windows minifilter 策略缓存 + 路径阻断实装
+3. 内核事件实时推送至 Node 服务 / 后端审计

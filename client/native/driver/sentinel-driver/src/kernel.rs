@@ -8,6 +8,8 @@ mod linux {
 
     const SENTINEL_IOC_MAGIC: u8 = b'S';
     const SENTINEL_POLICY_MAX: usize = 4096;
+    pub const SENTINEL_EVENT_FILE_OPEN: u32 = 1;
+    pub const SENTINEL_EVENT_FILE_BLOCK: u32 = 2;
 
     #[repr(C)]
     #[derive(Default, Clone)]
@@ -15,6 +17,7 @@ mod linux {
         pub version: u32,
         pub flags: u32,
         pub policy_len: u32,
+        pub event_count: u32,
         pub mode: [u8; 32],
     }
 
@@ -24,12 +27,28 @@ mod linux {
         pub data: [u8; SENTINEL_POLICY_MAX],
     }
 
+    #[repr(C)]
+    #[derive(Clone)]
+    pub struct SentinelEvent {
+        pub type_: u32,
+        pub pid: u32,
+        pub blocked: u32,
+        pub path: [u8; 256],
+    }
+
+    impl Default for SentinelEvent {
+        fn default() -> Self {
+            Self {
+                type_: 0,
+                pid: 0,
+                blocked: 0,
+                path: [0u8; 256],
+            }
+        }
+    }
+
     pub fn probe() -> Option<SentinelStatus> {
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open("/dev/sentinelhub")
-            .ok()?;
+        let file = open_dev().ok()?;
         let mut st = SentinelStatus::default();
         ioctl(
             file.as_raw_fd(),
@@ -40,6 +59,20 @@ mod linux {
         Some(st)
     }
 
+    pub fn get_policy() -> io::Result<Vec<u8>> {
+        let file = open_dev()?;
+        let mut req = SentinelPolicyReq {
+            len: 0,
+            data: [0u8; SENTINEL_POLICY_MAX],
+        };
+        ioctl(
+            file.as_raw_fd(),
+            ioctl_ior(3, std::mem::size_of::<SentinelPolicyReq>()),
+            &mut req,
+        )?;
+        Ok(req.data[..req.len as usize].to_vec())
+    }
+
     pub fn set_policy(payload: &[u8]) -> io::Result<()> {
         if payload.len() > SENTINEL_POLICY_MAX {
             return Err(io::Error::new(
@@ -47,10 +80,7 @@ mod linux {
                 "policy too large",
             ));
         }
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open("/dev/sentinelhub")?;
+        let file = open_dev()?;
         let mut req = SentinelPolicyReq {
             len: payload.len() as u32,
             data: [0u8; SENTINEL_POLICY_MAX],
@@ -61,6 +91,34 @@ mod linux {
             ioctl_iow(2, std::mem::size_of::<SentinelPolicyReq>()),
             &mut req,
         )
+    }
+
+    pub fn push_event(ev: &SentinelEvent) -> io::Result<()> {
+        let file = open_dev()?;
+        let mut copy = ev.clone();
+        ioctl(
+            file.as_raw_fd(),
+            ioctl_iow(4, std::mem::size_of::<SentinelEvent>()),
+            &mut copy,
+        )
+    }
+
+    pub fn get_event() -> io::Result<SentinelEvent> {
+        let file = open_dev()?;
+        let mut ev = SentinelEvent::default();
+        ioctl(
+            file.as_raw_fd(),
+            ioctl_ior(5, std::mem::size_of::<SentinelEvent>()),
+            &mut ev,
+        )?;
+        Ok(ev)
+    }
+
+    fn open_dev() -> io::Result<std::fs::File> {
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/sentinelhub")
     }
 
     fn ioctl<T>(fd: i32, request: libc::c_ulong, arg: &mut T) -> io::Result<()> {
@@ -80,10 +138,21 @@ mod linux {
     fn ioctl_ior(nr: u8, size: usize) -> libc::c_ulong {
         ioctl_iow(nr, size)
     }
+
+    pub fn path_to_bytes(path: &str) -> [u8; 256] {
+        let mut buf = [0u8; 256];
+        let bytes = path.as_bytes();
+        let len = bytes.len().min(255);
+        buf[..len].copy_from_slice(&bytes[..len]);
+        buf
+    }
 }
 
 #[cfg(target_os = "linux")]
-pub use linux::{probe, set_policy, SentinelStatus};
+pub use linux::{
+    get_event, get_policy, path_to_bytes, probe, push_event, set_policy, SentinelEvent,
+    SENTINEL_EVENT_FILE_BLOCK, SENTINEL_EVENT_FILE_OPEN,
+};
 
 #[cfg(not(target_os = "linux"))]
 pub fn probe() -> Option<()> {

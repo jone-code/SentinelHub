@@ -31,7 +31,7 @@ Kernel and userspace driver stack for deep enforcement.
 | Path | Platform | Role |
 |------|----------|------|
 | `linux/sentinel-kmod/` | Linux | Loadable kernel module, ioctl policy channel |
-| `windows/minifilter/` | Windows | Minifilter skeleton (phase 1) |
+| `windows/minifilter/` | Windows | Minifilter + communication port (phase 2) |
 | `include/sentinel_ioctl.h` | Both | Shared ioctl definitions |
 | `sentinel-driver/` | Linux/macOS | Userspace daemon + kernel bridge |
 
@@ -74,7 +74,7 @@ JSON-line over Unix socket:
 
 | Phase | Linux | Windows |
 |-------|-------|---------|
-| **1 (current)** | Char device + policy ioctl | Minifilter register + pre-create stub |
-| 2 | fanotify / LSM BPF file hooks | Filter communication port + policy cache |
-| 3 | Process exec blocking | Create-process callback |
-| 4 | Event ring buffer to userspace | USB write blocking |
+| **1** | Char device + policy ioctl | Minifilter register + pre-create stub |
+| **2 (current)** | fanotify file hooks + kernel event ring | FltCreateCommunicationPort skeleton |
+| 3 | LSM BPF process hooks | Pre-create path deny from policy cache |
+| 4 | Event streaming to Node service | USB write blocking |

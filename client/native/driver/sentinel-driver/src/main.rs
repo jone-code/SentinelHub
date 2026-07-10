@@ -1,16 +1,23 @@
 //! Userspace driver daemon — Unix socket JSON-line IPC + kernel module bridge.
 
+mod fanotify;
 mod kernel;
 
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
+use std::sync::Mutex;
 use std::time::Duration;
+
+#[cfg(target_os = "linux")]
+static FANOTIFY: Mutex<Option<fanotify::FanotifyWatcher>> = Mutex::new(None);
 
 #[derive(Deserialize)]
 struct Request {
     cmd: String,
     #[serde(default)]
     policy: Option<String>,
+    #[serde(default)]
+    limit: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -19,6 +26,7 @@ struct StatusResponse {
     version: &'static str,
     mode: &'static str,
     kernel_loaded: bool,
+    fanotify_active: bool,
     capabilities: Vec<&'static str>,
     message: String,
 }
@@ -38,8 +46,8 @@ fn driver_mode() -> (&'static str, bool, String) {
     #[cfg(target_os = "linux")]
     if let Some(st) = kernel::probe() {
         let msg = format!(
-            "kernel module active (version {}, policy {} bytes)",
-            st.version, st.policy_len
+            "kernel module active (v{}, policy {} bytes, events {})",
+            st.version, st.policy_len, st.event_count
         );
         return ("kernel_lsm", true, msg);
     }
@@ -48,6 +56,15 @@ fn driver_mode() -> (&'static str, bool, String) {
         false,
         "userspace driver daemon running; kernel module not loaded".into(),
     )
+}
+
+fn fanotify_active() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        return FANOTIFY.lock().unwrap().is_some();
+    }
+    #[allow(unreachable_code)]
+    false
 }
 
 fn capabilities(kernel: bool) -> Vec<&'static str> {
@@ -60,8 +77,53 @@ fn capabilities(kernel: bool) -> Vec<&'static str> {
     if kernel {
         caps.push("kernel_policy");
         caps.push("file_hook");
+        caps.push("event_ring");
+    }
+    if fanotify_active() {
+        caps.push("fanotify_active");
     }
     caps
+}
+
+#[cfg(target_os = "linux")]
+fn restart_fanotify(policy: &str) -> Result<(), String> {
+    let mut guard = FANOTIFY.lock().unwrap();
+    *guard = None;
+    match fanotify::FanotifyWatcher::start(policy) {
+        Ok(w) => {
+            *guard = Some(w);
+            Ok(())
+        }
+        Err(e) => Err(format!("fanotify start failed: {e}")),
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn restart_fanotify(_policy: &str) -> Result<(), String> {
+    Err("fanotify requires Linux".into())
+}
+
+fn apply_policy(policy: &str, kernel_loaded: bool) -> Result<serde_json::Value, String> {
+    #[cfg(target_os = "linux")]
+    if kernel_loaded {
+        kernel::set_policy(policy.as_bytes())
+            .map_err(|e| format!("kernel policy push failed: {e}"))?;
+    }
+    match restart_fanotify(policy) {
+        Ok(()) => Ok(serde_json::json!({
+            "ok": true,
+            "kernel_loaded": kernel_loaded,
+            "policy_bytes": policy.len(),
+            "fanotify": true
+        })),
+        Err(e) => Ok(serde_json::json!({
+            "ok": true,
+            "kernel_loaded": kernel_loaded,
+            "policy_bytes": policy.len(),
+            "fanotify": false,
+            "fanotify_warning": e
+        })),
+    }
 }
 
 fn handle_request(line: &str) -> String {
@@ -85,6 +147,7 @@ fn handle_request(line: &str) -> String {
             version: env!("CARGO_PKG_VERSION"),
             mode,
             kernel_loaded,
+            fanotify_active: fanotify_active(),
             capabilities: capabilities(kernel_loaded),
             message,
         })
@@ -102,29 +165,50 @@ fn handle_request(line: &str) -> String {
                 })
                 .unwrap_or_else(|_| "{}".into());
             };
+            match apply_policy(&policy, kernel_loaded) {
+                Ok(v) => v.to_string(),
+                Err(e) => serde_json::to_string(&ErrorResponse { ok: false, error: e })
+                    .unwrap_or_else(|_| "{}".into()),
+            }
+        }
+        "get_events" => {
             #[cfg(target_os = "linux")]
             {
-                match kernel::set_policy(policy.as_bytes()) {
-                    Ok(()) => serde_json::json!({
-                        "ok": true,
-                        "kernel_loaded": kernel_loaded,
-                        "policy_bytes": policy.len()
-                    })
-                    .to_string(),
-                    Err(e) => serde_json::to_string(&ErrorResponse {
-                        ok: false,
-                        error: format!("kernel policy push failed: {e}"),
-                    })
-                    .unwrap_or_else(|_| "{}".into()),
+                let limit = req.limit.unwrap_or(20);
+                let guard = FANOTIFY.lock().unwrap();
+                if let Some(w) = guard.as_ref() {
+                    let events = w.recent_events(limit);
+                    return serde_json::json!({ "ok": true, "events": events }).to_string();
                 }
+            }
+            serde_json::json!({ "ok": true, "events": [] }).to_string()
+        }
+        "drain_kernel_events" => {
+            #[cfg(target_os = "linux")]
+            {
+                let mut out = Vec::new();
+                loop {
+                    match kernel::get_event() {
+                        Ok(ev) => {
+                            let path = String::from_utf8_lossy(
+                                &ev.path[..ev.path.iter().position(|&b| b == 0).unwrap_or(ev.path.len())],
+                            )
+                            .into_owned();
+                            out.push(serde_json::json!({
+                                "type": ev.type_,
+                                "pid": ev.pid,
+                                "blocked": ev.blocked != 0,
+                                "path": path
+                            }));
+                        }
+                        Err(_) => break,
+                    }
+                }
+                serde_json::json!({ "ok": true, "events": out }).to_string()
             }
             #[cfg(not(target_os = "linux"))]
             {
-                serde_json::to_string(&ErrorResponse {
-                    ok: false,
-                    error: "set_policy requires Linux kernel module".into(),
-                })
-                .unwrap_or_else(|_| "{}".into())
+                serde_json::json!({ "ok": true, "events": [] }).to_string()
             }
         }
         other => serde_json::to_string(&ErrorResponse {
@@ -151,6 +235,15 @@ fn run_daemon() -> Result<(), String> {
 
     let (mode, kernel, _) = driver_mode();
     eprintln!("[sentinel-driver] listening on {path} (mode={mode}, kernel={kernel})");
+
+    #[cfg(target_os = "linux")]
+    if kernel {
+        if let Ok(policy) = kernel::get_policy() {
+            if let Ok(text) = String::from_utf8(policy) {
+                let _ = restart_fanotify(&text);
+            }
+        }
+    }
 
     loop {
         match listener.accept() {
@@ -192,6 +285,7 @@ fn main() {
             version: env!("CARGO_PKG_VERSION"),
             mode,
             kernel_loaded,
+            fanotify_active: fanotify_active(),
             capabilities: capabilities(kernel_loaded),
             message,
         };
