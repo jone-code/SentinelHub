@@ -2,6 +2,7 @@
 
 mod fanotify;
 mod kernel;
+mod process_block;
 
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
@@ -10,6 +11,9 @@ use std::time::Duration;
 
 #[cfg(target_os = "linux")]
 static FANOTIFY: Mutex<Option<fanotify::FanotifyWatcher>> = Mutex::new(None);
+
+#[cfg(target_os = "linux")]
+static PROCESS_WATCHER: Mutex<Option<process_block::ProcessWatcher>> = Mutex::new(None);
 
 #[derive(Deserialize)]
 struct Request {
@@ -27,6 +31,7 @@ struct StatusResponse {
     mode: &'static str,
     kernel_loaded: bool,
     fanotify_active: bool,
+    process_block_active: bool,
     capabilities: Vec<&'static str>,
     message: String,
 }
@@ -67,6 +72,15 @@ fn fanotify_active() -> bool {
     false
 }
 
+fn process_block_active() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        return PROCESS_WATCHER.lock().unwrap().is_some();
+    }
+    #[allow(unreachable_code)]
+    false
+}
+
 fn capabilities(kernel: bool) -> Vec<&'static str> {
     let mut caps = vec![
         "process_block",
@@ -81,6 +95,9 @@ fn capabilities(kernel: bool) -> Vec<&'static str> {
     }
     if fanotify_active() {
         caps.push("fanotify_active");
+    }
+    if process_block_active() {
+        caps.push("process_block_active");
     }
     caps
 }
@@ -103,27 +120,41 @@ fn restart_fanotify(_policy: &str) -> Result<(), String> {
     Err("fanotify requires Linux".into())
 }
 
+#[cfg(target_os = "linux")]
+fn restart_process_block(policy: &str) -> Result<(), String> {
+    let mut guard = PROCESS_WATCHER.lock().unwrap();
+    *guard = None;
+    match process_block::ProcessWatcher::start(policy) {
+        Ok(w) => {
+            *guard = Some(w);
+            Ok(())
+        }
+        Err(e) => Err(format!("process_block start failed: {e}")),
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn restart_process_block(_policy: &str) -> Result<(), String> {
+    Err("process_block requires Linux".into())
+}
+
 fn apply_policy(policy: &str, kernel_loaded: bool) -> Result<serde_json::Value, String> {
     #[cfg(target_os = "linux")]
     if kernel_loaded {
         kernel::set_policy(policy.as_bytes())
             .map_err(|e| format!("kernel policy push failed: {e}"))?;
     }
-    match restart_fanotify(policy) {
-        Ok(()) => Ok(serde_json::json!({
-            "ok": true,
-            "kernel_loaded": kernel_loaded,
-            "policy_bytes": policy.len(),
-            "fanotify": true
-        })),
-        Err(e) => Ok(serde_json::json!({
-            "ok": true,
-            "kernel_loaded": kernel_loaded,
-            "policy_bytes": policy.len(),
-            "fanotify": false,
-            "fanotify_warning": e
-        })),
-    }
+    let fanotify = restart_fanotify(policy);
+    let process_block = restart_process_block(policy);
+    Ok(serde_json::json!({
+        "ok": true,
+        "kernel_loaded": kernel_loaded,
+        "policy_bytes": policy.len(),
+        "fanotify": fanotify.is_ok(),
+        "fanotify_warning": fanotify.err(),
+        "process_block": process_block.is_ok(),
+        "process_block_warning": process_block.err()
+    }))
 }
 
 fn handle_request(line: &str) -> String {
@@ -148,6 +179,7 @@ fn handle_request(line: &str) -> String {
             mode,
             kernel_loaded,
             fanotify_active: fanotify_active(),
+            process_block_active: process_block_active(),
             capabilities: capabilities(kernel_loaded),
             message,
         })
@@ -175,13 +207,30 @@ fn handle_request(line: &str) -> String {
             #[cfg(target_os = "linux")]
             {
                 let limit = req.limit.unwrap_or(20);
-                let guard = FANOTIFY.lock().unwrap();
-                if let Some(w) = guard.as_ref() {
-                    let events = w.recent_events(limit);
-                    return serde_json::json!({ "ok": true, "events": events }).to_string();
+                let mut file_events = Vec::new();
+                let mut process_events = Vec::new();
+                if let Some(w) = FANOTIFY.lock().unwrap().as_ref() {
+                    file_events = w.recent_events(limit);
                 }
+                if let Some(w) = PROCESS_WATCHER.lock().unwrap().as_ref() {
+                    process_events = w.recent_events(limit);
+                }
+                return serde_json::json!({
+                    "ok": true,
+                    "file_events": file_events,
+                    "process_events": process_events
+                })
+                .to_string();
             }
-            serde_json::json!({ "ok": true, "events": [] }).to_string()
+            #[cfg(not(target_os = "linux"))]
+            {
+                serde_json::json!({
+                    "ok": true,
+                    "file_events": [],
+                    "process_events": []
+                })
+                .to_string()
+            }
         }
         "drain_kernel_events" => {
             #[cfg(target_os = "linux")]
@@ -241,6 +290,7 @@ fn run_daemon() -> Result<(), String> {
         if let Ok(policy) = kernel::get_policy() {
             if let Ok(text) = String::from_utf8(policy) {
                 let _ = restart_fanotify(&text);
+                let _ = restart_process_block(&text);
             }
         }
     }
@@ -286,6 +336,7 @@ fn main() {
             mode,
             kernel_loaded,
             fanotify_active: fanotify_active(),
+            process_block_active: process_block_active(),
             capabilities: capabilities(kernel_loaded),
             message,
         };

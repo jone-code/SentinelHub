@@ -13,7 +13,7 @@
 
 #include "../../include/sentinel_ioctl.h"
 
-#define DRIVER_VERSION 2
+#define DRIVER_VERSION 3
 
 static DEFINE_MUTEX(policy_lock);
 static DEFINE_MUTEX(event_lock);
@@ -176,5 +176,5 @@ module_exit(sentinel_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("SentinelHub");
-MODULE_DESCRIPTION("SentinelHub enforcement policy + event ring (phase 2)");
-MODULE_VERSION("0.2.0");
+MODULE_DESCRIPTION("SentinelHub enforcement policy + event ring (phase 3)");
+MODULE_VERSION("0.3.0");

@@ -29,7 +29,7 @@ pub struct Violation {
 pub fn run(policy_path: &Path) -> Result<EnforceResult, String> {
     let raw = fs::read_to_string(policy_path).map_err(|e| e.to_string())?;
     let driver = crate::driver::status();
-    if driver.kernel_loaded {
+    if driver.available {
         let _ = crate::driver::push_policy(&raw);
     }
     let policy: Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;

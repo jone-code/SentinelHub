@@ -69,18 +69,21 @@ docker compose up -d
 
 启用 `REMOTE_TURN_SECRET` 后，后端为每次 `rtc-config` 请求生成临时 username/credential。
 
-## 内核驱动（phase 2）
+## 内核驱动（phase 3）
 
 | 平台 | 能力 |
 |------|------|
-| Linux kmod | 事件 ring buffer（`PUSH_EVENT` / `GET_EVENT` ioctl） |
-| Linux daemon | **fanotify** 文件打开钩子（`sensitive_path` / `file_hook` 规则，`block` 动作拒绝访问） |
-| Windows | minifilter **通信端口**骨架（`\\SentinelHubPort`） |
+| Linux kmod v3 | 事件 ring buffer；新增 `PROCESS_EXEC` / `PROCESS_BLOCK` 事件类型 |
+| Linux daemon | **fanotify** 文件钩子 + **process_block** `/proc` 进程监视器 |
+| Linux bpf | 可选 LSM BPF `bprm_check_security`（`linux/bpf/`） |
+| Windows | minifilter **策略缓存** + PreCreate **路径阻断**（`SENTINEL_MSG_SET_POLICY`） |
 
-Daemon IPC 新增：`get_events`、`drain_kernel_events`。
+Daemon IPC：`get_events`（`file_events` + `process_events`）、`drain_kernel_events`。
+
+`push_policy` 同时写入 kmod ioctl 与 daemon socket，确保 fanotify/process_block 同步更新。
 
 ## 后续增强
 
-1. Linux LSM BPF 进程拦截
-2. Windows minifilter 策略缓存 + 路径阻断实装
-3. 内核事件实时推送至 Node 服务 / 后端审计
+1. 内核事件实时推送至 Node 服务 / 后端审计（phase 4）
+2. Windows USB 写入阻断
+3. BPF map 与策略 JSON 自动同步

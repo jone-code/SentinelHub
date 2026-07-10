@@ -1,6 +1,6 @@
-# Windows minifilter driver (phase 1 skeleton)
+# Windows minifilter driver (phase 3)
 
-Kernel-mode file system minifilter for DLP path blocking and audit. Phase 1 registers `IRP_MJ_CREATE` pre-operation callback stub.
+Kernel-mode file system minifilter for DLP path blocking. Phase 3 implements policy cache and PreCreate path deny.
 
 ## Prerequisites
 
@@ -12,8 +12,22 @@ Kernel-mode file system minifilter for DLP path blocking and audit. Phase 1 regi
 
 | File | Role |
 |------|------|
-| `SentinelFilter.c` | `DriverEntry`, filter registration, pre-create stub |
-| `SentinelFilter.h` | Callback prototypes |
+| `SentinelFilter.c` | DriverEntry, comm port, policy cache, PreCreate deny |
+| `SentinelFilter.h` | Policy structs, message types, callback prototypes |
+
+## Communication port
+
+Port name: `\\SentinelHubPort`
+
+Message format (`SENTINEL_PORT_MESSAGE`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| Type | ULONG | `SENTINEL_MSG_SET_POLICY` (1) or `SENTINEL_MSG_GET_STATUS` (2) |
+| Length | ULONG | Payload bytes |
+| Data | UCHAR[] | Policy JSON (same format as Linux daemon) |
+
+On `SET_POLICY`, the driver parses `sensitive_path` / `file_hook` rules with `action: block` and caches patterns. `PreCreate` denies matching paths with `STATUS_ACCESS_DENIED`.
 
 ## Build (developer machine)
 
@@ -22,18 +36,14 @@ Kernel-mode file system minifilter for DLP path blocking and audit. Phase 1 regi
 3. Build x64 Release
 4. Install with `fltmc load SentinelHub` (service name TBD in INF)
 
-## Userspace communication
-
-Policy channel mirrors Linux ioctl layout in `driver/include/sentinel_ioctl.h`. Phase 2 adds filter communication port (`FltCreateCommunicationPort`) for policy push from `sentinel-driver`.
-
 ## Roadmap
 
 | Phase | Capability |
 |-------|------------|
-| 1 | Filter load/unload, pre-create pass-through (this skeleton) |
-| 2 | Communication port + policy cache |
-| 3 | Block sensitive path / USB writes |
-| 4 | Process create callback driver |
+| 1 | Filter load/unload, pre-create pass-through |
+| 2 | Communication port skeleton |
+| 3 | Policy cache + path deny (current) |
+| 4 | USB write blocking, process create callback |
 
 ## Testing
 

@@ -31,7 +31,8 @@ Kernel and userspace driver stack for deep enforcement.
 | Path | Platform | Role |
 |------|----------|------|
 | `linux/sentinel-kmod/` | Linux | Loadable kernel module, ioctl policy channel |
-| `windows/minifilter/` | Windows | Minifilter + communication port (phase 2) |
+| `linux/bpf/` | Linux | Optional LSM BPF process block (phase 3) |
+| `windows/minifilter/` | Windows | Minifilter + policy cache + path deny (phase 3) |
 | `include/sentinel_ioctl.h` | Both | Shared ioctl definitions |
 | `sentinel-driver/` | Linux/macOS | Userspace daemon + kernel bridge |
 
@@ -68,13 +69,17 @@ JSON-line over Unix socket:
 ```json
 {"cmd":"status"}
 {"cmd":"set_policy","policy":"{...}"}
+{"cmd":"get_events","limit":20}
+{"cmd":"drain_kernel_events"}
 ```
+
+`get_events` returns `{ file_events, process_events }`.
 
 ## Phase roadmap
 
 | Phase | Linux | Windows |
 |-------|-------|---------|
 | **1** | Char device + policy ioctl | Minifilter register + pre-create stub |
-| **2 (current)** | fanotify file hooks + kernel event ring | FltCreateCommunicationPort skeleton |
-| 3 | LSM BPF process hooks | Pre-create path deny from policy cache |
+| **2** | fanotify file hooks + kernel event ring | FltCreateCommunicationPort skeleton |
+| **3 (current)** | process_block watcher + LSM BPF skeleton | Policy cache + PreCreate path deny |
 | 4 | Event streaming to Node service | USB write blocking |

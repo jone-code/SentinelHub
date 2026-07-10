@@ -73,13 +73,73 @@ pub fn status() -> DriverStatus {
     }
 }
 
-/// Push policy JSON to kernel module when loaded.
+/// Push policy JSON to kernel module and/or driver daemon.
 pub fn push_policy(payload: &str) -> bool {
     #[cfg(target_os = "linux")]
     {
-        return kernel::set_policy(payload.as_bytes()).is_ok();
+        let mut ok = false;
+        if kernel::set_policy(payload.as_bytes()).is_ok() {
+            ok = true;
+        }
+        if push_policy_to_daemon(payload) {
+            ok = true;
+        }
+        return ok;
     }
     #[allow(unreachable_code)]
+    false
+}
+
+#[cfg(unix)]
+fn push_policy_to_daemon(payload: &str) -> bool {
+    use std::io::{Read, Write};
+    use std::os::unix::net::UnixStream;
+
+    let path = default_socket_path();
+    let mut stream = match UnixStream::connect(&path) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    stream
+        .set_read_timeout(Some(Duration::from_millis(1000)))
+        .ok();
+    stream
+        .set_write_timeout(Some(Duration::from_millis(1000)))
+        .ok();
+
+    let request = serde_json::json!({
+        "cmd": "set_policy",
+        "policy": payload
+    });
+    if stream
+        .write_all(format!("{request}\n").to_string().as_bytes())
+        .is_err()
+    {
+        return false;
+    }
+    if stream.flush().is_err() {
+        return false;
+    }
+
+    let mut buf = vec![0u8; 4096];
+    let n = match stream.read(&mut buf) {
+        Ok(n) if n > 0 => n,
+        _ => return false,
+    };
+    let text = String::from_utf8_lossy(&buf[..n]);
+    let line = match text.lines().next() {
+        Some(l) => l,
+        None => return false,
+    };
+    let value: serde_json::Value = match serde_json::from_str(line) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    value.get("ok").and_then(|v| v.as_bool()).unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn push_policy_to_daemon(_payload: &str) -> bool {
     false
 }
 

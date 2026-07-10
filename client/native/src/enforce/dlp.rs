@@ -42,7 +42,7 @@ pub struct DlpViolation {
 pub fn run(rules_path: &Path) -> Result<DlpResult, String> {
     let raw = fs::read_to_string(rules_path).map_err(|e| e.to_string())?;
     let driver = crate::driver::status();
-    if driver.kernel_loaded {
+    if driver.available {
         let _ = crate::driver::push_policy(&raw);
     }
     let rules = load_rules_from_str(&raw)?;
