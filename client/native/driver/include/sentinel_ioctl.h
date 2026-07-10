@@ -32,6 +32,8 @@ typedef uint64_t __u64;
 
 #define SENTINEL_EVENT_FILE_OPEN  1
 #define SENTINEL_EVENT_FILE_BLOCK 2
+#define SENTINEL_EVENT_PROCESS_EXEC  3
+#define SENTINEL_EVENT_PROCESS_BLOCK 4
 
 struct sentinel_status {
 	__u32 version;
@@ -56,5 +58,6 @@ struct sentinel_event {
 /* flags */
 #define SENTINEL_FLAG_KERNEL_LOADED 0x1
 #define SENTINEL_FLAG_POLICY_SET    0x2
+#define SENTINEL_FLAG_BPF_ATTACHED  0x4
 
 #endif /* SENTINEL_IOCTL_H */

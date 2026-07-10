@@ -10,6 +10,8 @@ mod linux {
     const SENTINEL_POLICY_MAX: usize = 4096;
     pub const SENTINEL_EVENT_FILE_OPEN: u32 = 1;
     pub const SENTINEL_EVENT_FILE_BLOCK: u32 = 2;
+    pub const SENTINEL_EVENT_PROCESS_EXEC: u32 = 3;
+    pub const SENTINEL_EVENT_PROCESS_BLOCK: u32 = 4;
 
     #[repr(C)]
     #[derive(Default, Clone)]
@@ -151,7 +153,8 @@ mod linux {
 #[cfg(target_os = "linux")]
 pub use linux::{
     get_event, get_policy, path_to_bytes, probe, push_event, set_policy, SentinelEvent,
-    SENTINEL_EVENT_FILE_BLOCK, SENTINEL_EVENT_FILE_OPEN,
+    SENTINEL_EVENT_FILE_BLOCK, SENTINEL_EVENT_FILE_OPEN, SENTINEL_EVENT_PROCESS_BLOCK,
+    SENTINEL_EVENT_PROCESS_EXEC,
 };
 
 #[cfg(not(target_os = "linux"))]
