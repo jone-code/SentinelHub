@@ -9,8 +9,11 @@
 
 #define SENTINEL_FILTER_NAME L"SentinelHub Filter"
 #define SENTINEL_FILTER_TAG  'SntH'
+#define SENTINEL_PORT_NAME   L"\\SentinelHubPort"
 
 extern PFLT_FILTER g_sentinel_filter;
+extern PFLT_PORT g_sentinel_server_port;
+extern PFLT_PORT g_sentinel_client_port;
 
 NTSTATUS SentinelInstanceSetup(
     _In_ PCFLT_RELATED_OBJECTS FltObjects,

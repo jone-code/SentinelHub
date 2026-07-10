@@ -35,6 +35,8 @@ pub fn status() -> DriverStatus {
             kernel_version: Some(kst.version),
             capabilities: Some(vec![
                 "kernel_policy".into(),
+                "file_hook".into(),
+                "event_ring".into(),
                 "process_block".into(),
                 "usb_unmount".into(),
                 "sensitive_path_scan".into(),

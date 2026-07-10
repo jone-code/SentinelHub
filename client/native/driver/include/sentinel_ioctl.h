@@ -23,19 +23,34 @@ typedef uint64_t __u64;
 #define SENTINEL_IOC_STATUS      _IOR(SENTINEL_IOC_MAGIC, 1, struct sentinel_status)
 #define SENTINEL_IOC_SET_POLICY  _IOW(SENTINEL_IOC_MAGIC, 2, struct sentinel_policy_req)
 #define SENTINEL_IOC_GET_POLICY  _IOR(SENTINEL_IOC_MAGIC, 3, struct sentinel_policy_req)
+#define SENTINEL_IOC_PUSH_EVENT  _IOW(SENTINEL_IOC_MAGIC, 4, struct sentinel_event)
+#define SENTINEL_IOC_GET_EVENT   _IOR(SENTINEL_IOC_MAGIC, 5, struct sentinel_event)
 
 #define SENTINEL_POLICY_MAX 4096
+#define SENTINEL_EVENT_PATH_MAX 256
+#define SENTINEL_EVENT_RING_SIZE 64
+
+#define SENTINEL_EVENT_FILE_OPEN  1
+#define SENTINEL_EVENT_FILE_BLOCK 2
 
 struct sentinel_status {
 	__u32 version;
 	__u32 flags;
 	__u32 policy_len;
+	__u32 event_count;
 	char  mode[32];
 };
 
 struct sentinel_policy_req {
 	__u32 len;
 	char  data[SENTINEL_POLICY_MAX];
+};
+
+struct sentinel_event {
+	__u32 type;
+	__u32 pid;
+	__u32 blocked;
+	char  path[SENTINEL_EVENT_PATH_MAX];
 };
 
 /* flags */
