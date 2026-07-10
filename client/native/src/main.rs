@@ -123,6 +123,19 @@ fn main() {
         return;
     }
 
+    if args.len() >= 4 && args[1] == "driver" && args[2] == "push-policy" {
+        let policy = parse_flag_string(&args, "--policy").unwrap_or_else(|| {
+            eprintln!("--policy required");
+            std::process::exit(2);
+        });
+        let ok = driver::push_policy(&policy);
+        println!("{}", serde_json::json!({ "ok": ok }));
+        if !ok {
+            std::process::exit(1);
+        }
+        return;
+    }
+
     if args.len() >= 3 && args[1] == "driver" && args[2] == "events" {
         let json_flag = args.iter().any(|a| a == "--json");
         let limit = parse_flag_usize(&args, "--limit").unwrap_or(50);
@@ -156,6 +169,7 @@ fn main() {
     eprintln!("  sentinel-native enforce dlp --rules-file <path> --json");
     eprintln!("  sentinel-native enforce nac --policy-file <path> --compliance-score <n> --json");
     eprintln!("  sentinel-native driver status --json");
+    eprintln!("  sentinel-native driver push-policy --policy <json>");
     eprintln!("  sentinel-native driver events [--limit <n>] --json");
     eprintln!("  sentinel-native scan compliance [--rules-file <path>] --json");
     std::process::exit(2);
@@ -180,6 +194,13 @@ fn parse_flag_usize(args: &[String], flag: &str) -> Option<usize> {
         .position(|a| a == flag)
         .and_then(|i| args.get(i + 1))
         .and_then(|v| v.parse().ok())
+}
+
+fn parse_flag_string(args: &[String], flag: &str) -> Option<String> {
+    args.iter()
+        .position(|a| a == flag)
+        .and_then(|i| args.get(i + 1))
+        .cloned()
 }
 
 fn collect_assets() -> Result<String, String> {

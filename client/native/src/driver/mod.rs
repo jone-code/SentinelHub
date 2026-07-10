@@ -3,6 +3,9 @@
 #[cfg(target_os = "linux")]
 mod kernel;
 
+#[cfg(target_os = "windows")]
+mod windows;
+
 use serde::Serialize;
 use serde_json::Value;
 use std::time::Duration;
@@ -31,6 +34,11 @@ pub struct DriverStatus {
 
 pub fn status() -> DriverStatus {
     let socket_path = default_socket_path();
+
+    #[cfg(target_os = "windows")]
+    if let Some(st) = windows::probe() {
+        return st;
+    }
 
     #[cfg(target_os = "linux")]
     if let Some(kst) = kernel::probe() {
@@ -83,6 +91,10 @@ pub fn status() -> DriverStatus {
 
 /// Push policy JSON to kernel module and/or driver daemon.
 pub fn push_policy(payload: &str) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        return windows::push_policy(payload);
+    }
     #[cfg(target_os = "linux")]
     {
         let mut ok = false;

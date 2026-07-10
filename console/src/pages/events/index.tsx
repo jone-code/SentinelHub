@@ -34,6 +34,7 @@ export default function Events() {
   const [pageSize, setPageSize] = useState(20);
   const [eventType, setEventType] = useState<string | undefined>();
   const [severity, setSeverity] = useState<string | undefined>();
+  const [storage, setStorage] = useState<'hot' | 'cold'>('hot');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -43,6 +44,7 @@ export default function Events() {
         page_size: pageSize,
         event_type: eventType || undefined,
         severity: severity || undefined,
+        storage,
       },
     })
       .then((res) => {
@@ -54,7 +56,7 @@ export default function Events() {
         setTotal(0);
       })
       .finally(() => setLoading(false));
-  }, [page, pageSize, eventType, severity]);
+  }, [page, pageSize, eventType, severity, storage]);
 
   useEffect(() => {
     load();
@@ -62,7 +64,7 @@ export default function Events() {
 
   const columns = [
     { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
-    { title: '主机', dataIndex: 'hostname', key: 'hostname', width: 140 },
+    { title: '主机', dataIndex: 'hostname', key: 'hostname', width: 140, render: (v: string, row: EventRow) => v || row.agent_id || '—' },
     { title: 'Agent', dataIndex: 'agent_id', key: 'agent_id', width: 120 },
     {
       title: '类型',
@@ -122,6 +124,18 @@ export default function Events() {
             { value: 'critical', label: 'critical' },
             { value: 'warning', label: 'warning' },
             { value: 'info', label: 'info' },
+          ]}
+        />
+        <Select
+          style={{ width: 160 }}
+          value={storage}
+          onChange={(v) => {
+            setPage(1);
+            setStorage(v);
+          }}
+          options={[
+            { value: 'hot', label: '热存储 (MySQL)' },
+            { value: 'cold', label: '冷存储 (ClickHouse)' },
           ]}
         />
       </Space>
