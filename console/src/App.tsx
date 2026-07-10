@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-r
 import Dashboard from './pages/dashboard';
 import Devices from './pages/devices';
 import Audit from './pages/audit';
+import Timeline from './pages/timeline';
 import Login from './pages/login';
 import Policies from './pages/policies';
 import DeviceGroups from './pages/device-groups';
@@ -26,6 +27,7 @@ const menuItems = [
   { key: '/policies', label: <Link to="/policies">策略管理</Link> },
   { key: '/device-groups', label: <Link to="/device-groups">设备组</Link> },
   { key: '/events', label: <Link to="/events">安全事件</Link> },
+  { key: '/timeline', label: <Link to="/timeline">安全时间线</Link> },
   { key: '/compliance', label: <Link to="/compliance">合规检查</Link> },
   { key: '/dlp', label: <Link to="/dlp">DLP</Link> },
   { key: '/nac', label: <Link to="/nac">网络准入</Link> },
@@ -74,6 +76,7 @@ function AppLayout() {
             <Route path="/policies" element={<Policies />} />
             <Route path="/device-groups" element={<DeviceGroups />} />
             <Route path="/events" element={<Events />} />
+            <Route path="/timeline" element={<Timeline />} />
             <Route path="/compliance" element={<Compliance />} />
             <Route path="/dlp" element={<Dlp />} />
             <Route path="/nac" element={<Nac />} />

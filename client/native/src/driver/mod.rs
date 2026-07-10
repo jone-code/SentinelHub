@@ -112,6 +112,14 @@ pub fn push_policy(payload: &str) -> bool {
 
 /// Fetch daemon watcher events and drain kernel ring buffer.
 pub fn collect_events(limit: usize) -> DriverEventBatch {
+    #[cfg(target_os = "windows")]
+    {
+        let mut batch = DriverEventBatch::default();
+        batch.kernel_events = windows::drain_events();
+        let _ = limit;
+        return batch;
+    }
+
     #[cfg(unix)]
     {
         let mut batch = DriverEventBatch::default();
