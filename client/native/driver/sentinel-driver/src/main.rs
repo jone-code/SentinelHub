@@ -1,4 +1,6 @@
-//! Userspace driver daemon — Unix socket JSON-line IPC.
+//! Userspace driver daemon — Unix socket JSON-line IPC + kernel module bridge.
+
+mod kernel;
 
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
@@ -7,6 +9,8 @@ use std::time::Duration;
 #[derive(Deserialize)]
 struct Request {
     cmd: String,
+    #[serde(default)]
+    policy: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -14,8 +18,9 @@ struct StatusResponse {
     ok: bool,
     version: &'static str,
     mode: &'static str,
+    kernel_loaded: bool,
     capabilities: Vec<&'static str>,
-    message: &'static str,
+    message: String,
 }
 
 #[derive(Serialize)]
@@ -27,6 +32,36 @@ struct ErrorResponse {
 fn socket_path() -> String {
     std::env::var("SENTINEL_DRIVER_SOCKET")
         .unwrap_or_else(|_| "/tmp/sentinel-driver.sock".into())
+}
+
+fn driver_mode() -> (&'static str, bool, String) {
+    #[cfg(target_os = "linux")]
+    if let Some(st) = kernel::probe() {
+        let msg = format!(
+            "kernel module active (version {}, policy {} bytes)",
+            st.version, st.policy_len
+        );
+        return ("kernel_lsm", true, msg);
+    }
+    (
+        "userspace_daemon",
+        false,
+        "userspace driver daemon running; kernel module not loaded".into(),
+    )
+}
+
+fn capabilities(kernel: bool) -> Vec<&'static str> {
+    let mut caps = vec![
+        "process_block",
+        "usb_unmount",
+        "sensitive_path_scan",
+        "health_probe",
+    ];
+    if kernel {
+        caps.push("kernel_policy");
+        caps.push("file_hook");
+    }
+    caps
 }
 
 fn handle_request(line: &str) -> String {
@@ -41,31 +76,57 @@ fn handle_request(line: &str) -> String {
         }
     };
 
+    let (mode, kernel_loaded, message) = driver_mode();
+
     let response = match req.cmd.as_str() {
         "ping" => serde_json::json!({ "ok": true, "pong": true }).to_string(),
         "status" => serde_json::to_string(&StatusResponse {
             ok: true,
             version: env!("CARGO_PKG_VERSION"),
-            mode: "userspace_daemon",
-            capabilities: vec![
-                "process_block",
-                "usb_unmount",
-                "sensitive_path_scan",
-                "health_probe",
-            ],
-            message: "userspace driver daemon running; kernel hooks not loaded",
+            mode,
+            kernel_loaded,
+            capabilities: capabilities(kernel_loaded),
+            message,
         })
         .unwrap_or_else(|_| "{}".into()),
         "capabilities" => serde_json::json!({
             "ok": true,
-            "capabilities": [
-                "process_block",
-                "usb_unmount",
-                "sensitive_path_scan",
-                "health_probe"
-            ]
+            "capabilities": capabilities(kernel_loaded)
         })
         .to_string(),
+        "set_policy" => {
+            let Some(policy) = req.policy.filter(|p| !p.is_empty()) else {
+                return serde_json::to_string(&ErrorResponse {
+                    ok: false,
+                    error: "policy required".into(),
+                })
+                .unwrap_or_else(|_| "{}".into());
+            };
+            #[cfg(target_os = "linux")]
+            {
+                match kernel::set_policy(policy.as_bytes()) {
+                    Ok(()) => serde_json::json!({
+                        "ok": true,
+                        "kernel_loaded": kernel_loaded,
+                        "policy_bytes": policy.len()
+                    })
+                    .to_string(),
+                    Err(e) => serde_json::to_string(&ErrorResponse {
+                        ok: false,
+                        error: format!("kernel policy push failed: {e}"),
+                    })
+                    .unwrap_or_else(|_| "{}".into()),
+                }
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                serde_json::to_string(&ErrorResponse {
+                    ok: false,
+                    error: "set_policy requires Linux kernel module".into(),
+                })
+                .unwrap_or_else(|_| "{}".into())
+            }
+        }
         other => serde_json::to_string(&ErrorResponse {
             ok: false,
             error: format!("unknown cmd: {other}"),
@@ -88,7 +149,8 @@ fn run_daemon() -> Result<(), String> {
         .set_nonblocking(true)
         .map_err(|e| format!("set_nonblocking: {e}"))?;
 
-    eprintln!("[sentinel-driver] listening on {path}");
+    let (mode, kernel, _) = driver_mode();
+    eprintln!("[sentinel-driver] listening on {path} (mode={mode}, kernel={kernel})");
 
     loop {
         match listener.accept() {
@@ -124,17 +186,14 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() >= 2 && args[1] == "status" {
         let json = args.iter().any(|a| a == "--json");
+        let (mode, kernel_loaded, message) = driver_mode();
         let status = StatusResponse {
             ok: true,
             version: env!("CARGO_PKG_VERSION"),
-            mode: "userspace_daemon",
-            capabilities: vec![
-                "process_block",
-                "usb_unmount",
-                "sensitive_path_scan",
-                "health_probe",
-            ],
-            message: "daemon binary ready",
+            mode,
+            kernel_loaded,
+            capabilities: capabilities(kernel_loaded),
+            message,
         };
         if json {
             println!("{}", serde_json::to_string(&status).unwrap_or_else(|_| "{}".into()));

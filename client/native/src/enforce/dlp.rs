@@ -40,7 +40,12 @@ pub struct DlpViolation {
 }
 
 pub fn run(rules_path: &Path) -> Result<DlpResult, String> {
-    let rules = load_rules(rules_path)?;
+    let raw = fs::read_to_string(rules_path).map_err(|e| e.to_string())?;
+    let driver = crate::driver::status();
+    if driver.kernel_loaded {
+        let _ = crate::driver::push_policy(&raw);
+    }
+    let rules = load_rules_from_str(&raw)?;
     let mut violations = Vec::new();
 
     for rule in rules {
@@ -80,14 +85,13 @@ pub fn run(rules_path: &Path) -> Result<DlpResult, String> {
 
     Ok(DlpResult {
         checked_at: now_epoch(),
-        driver_assisted: crate::driver::status().available,
+        driver_assisted: driver.available,
         violations,
     })
 }
 
-fn load_rules(path: &Path) -> Result<Vec<DlpRule>, String> {
-    let raw = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let value: Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+fn load_rules_from_str(raw: &str) -> Result<Vec<DlpRule>, String> {
+    let value: Value = serde_json::from_str(raw).map_err(|e| e.to_string())?;
     if let Some(arr) = value.as_array() {
         return serde_json::from_value(Value::Array(arr.clone())).map_err(|e| e.to_string());
     }
