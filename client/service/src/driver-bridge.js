@@ -41,7 +41,11 @@ export async function resolveDriverBin(configuredPath) {
  * @param {string | null} nativeBin
  */
 export async function ensureDriverDaemon(driverBin, nativeBin) {
-  if (!driverBin || process.platform === 'win32') {
+  if (process.platform === 'win32') {
+    const status = await queryDriverViaNative(nativeBin);
+    return Boolean(status?.available);
+  }
+  if (!driverBin) {
     return false;
   }
   const status = await queryDriverViaNative(nativeBin);
@@ -91,5 +95,20 @@ export async function queryDriverEvents(nativeBin, limit = 50) {
   } catch (err) {
     console.warn('[sentinel-service] driver events failed:', err.message);
     return null;
+  }
+}
+
+/**
+ * @param {string | null} nativeBin
+ * @param {string} policyJson
+ */
+export async function pushPolicyViaNative(nativeBin, policyJson) {
+  if (!nativeBin) return false;
+  try {
+    const result = await runNative(nativeBin, ['driver', 'push-policy', '--policy', policyJson]);
+    return Boolean(result?.ok);
+  } catch (err) {
+    console.warn('[sentinel-service] driver push-policy failed:', err.message);
+    return false;
   }
 }

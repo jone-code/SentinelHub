@@ -63,3 +63,9 @@ sentinelhub:
       enabled: ${AUDIT_CH_ENABLED:false}
       url: ${AUDIT_CH_URL:http://localhost:8123}
       database: ${AUDIT_CH_DATABASE:sentinelhub}
+    nats:
+      enabled: ${AUDIT_NATS_ENABLED:false}
+      url: ${NATS_URL:nats://localhost:4222}
+      subject: ${AUDIT_NATS_SUBJECT:sentinel.audit.events}
+      stream: ${AUDIT_NATS_STREAM:SENTINEL_AUDIT}
+      durable: ${AUDIT_NATS_DURABLE:audit-writer}

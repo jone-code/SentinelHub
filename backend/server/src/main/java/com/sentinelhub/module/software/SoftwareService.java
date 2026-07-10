@@ -13,13 +13,18 @@ import java.util.Map;
 public class SoftwareService {
 
     private final ClientEventRepository eventRepository;
+    private final ClickHouseClientEventRepository clickHouseClientEventRepository;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
     private final ZerotrustService zerotrustService;
 
-    public SoftwareService(ClientEventRepository eventRepository, AuditService auditService,
-                           ObjectMapper objectMapper, ZerotrustService zerotrustService) {
+    public SoftwareService(ClientEventRepository eventRepository,
+                           ClickHouseClientEventRepository clickHouseClientEventRepository,
+                           AuditService auditService,
+                           ObjectMapper objectMapper,
+                           ZerotrustService zerotrustService) {
         this.eventRepository = eventRepository;
+        this.clickHouseClientEventRepository = clickHouseClientEventRepository;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
         this.zerotrustService = zerotrustService;
@@ -39,19 +44,28 @@ public class SoftwareService {
             Map<String, Object> detail = event.get("detail") instanceof Map<?, ?> m
                     ? (Map<String, Object>) m : event;
             detail.put("client_id", clientId);
-            eventRepository.insert(tenantId, deviceId, type, severity, toJson(detail));
+            String detailJson = toJson(detail);
+            eventRepository.insert(tenantId, deviceId, type, severity, detailJson);
+            clickHouseClientEventRepository.insert(tenantId, deviceId, type, severity, detailJson);
             auditService.log(tenantId, "agent", clientId, type, "device", deviceId, detail, null);
         }
         zerotrustService.recomputeForDevice(tenantId, deviceId);
     }
 
     public List<Map<String, Object>> listEventsForAdmin(String tenantId, int page, int pageSize,
-                                                        String eventTypeFilter, String severityFilter) {
+                                                        String eventTypeFilter, String severityFilter,
+                                                        String storage) {
         int offset = Math.max(0, (page - 1) * pageSize);
+        if ("cold".equalsIgnoreCase(storage)) {
+            return clickHouseClientEventRepository.list(tenantId, pageSize, offset, eventTypeFilter, severityFilter);
+        }
         return eventRepository.listByTenant(tenantId, pageSize, offset, eventTypeFilter, severityFilter);
     }
 
-    public int countEvents(String tenantId, String eventTypeFilter, String severityFilter) {
+    public int countEvents(String tenantId, String eventTypeFilter, String severityFilter, String storage) {
+        if ("cold".equalsIgnoreCase(storage)) {
+            return clickHouseClientEventRepository.count(tenantId, eventTypeFilter, severityFilter);
+        }
         return eventRepository.countByTenant(tenantId, eventTypeFilter, severityFilter);
     }
 

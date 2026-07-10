@@ -78,8 +78,24 @@ docker compose up -d
 | ClickHouse | 审计冷存储双写（`AUDIT_CH_ENABLED=true`） |
 | 管理台 | 安全事件/审计日志分页、驱动事件筛选、冷热存储切换 |
 
+## 平台增强（phase 6）
+
+| 组件 | 能力 |
+|------|------|
+| Windows 客户端 | `sentinel-native` 通过 `FilterConnectCommunicationPort` 推送策略至 minifilter |
+| ClickHouse | `client_events` 冷归档双写 + 管理台 `storage=cold` 查询 |
+| NATS | 审计异步管道（JetStream `sentinel.audit.events` → MySQL + ClickHouse） |
+
+### 配置
+
+| 变量 | 说明 |
+|------|------|
+| `AUDIT_CH_ENABLED` | ClickHouse 冷热双写 |
+| `AUDIT_NATS_ENABLED` | 审计走 NATS 异步写入 |
+| `NATS_URL` | NATS 连接地址 |
+
 ## 后续增强
 
-1. Windows 用户态 minifilter 策略推送客户端
-2. NATS 异步审计管道
-3. ClickHouse client_events 冷归档
+1. client_events NATS 异步摄入
+2. Windows 驱动事件上报
+3. ClickHouse 跨表联合查询
