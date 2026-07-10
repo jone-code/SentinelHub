@@ -28,4 +28,8 @@ public record AuditEvent(
     public static final String EVENT_COMPLIANCE_FAILED = "compliance.failed";
     public static final String EVENT_NAC_DENIED = "nac.denied";
     public static final String EVENT_REMOTE_SESSION = "remote.session";
+    public static final String EVENT_DRIVER_FILE_BLOCKED = "driver.file_blocked";
+    public static final String EVENT_DRIVER_FILE_OPEN = "driver.file_open";
+    public static final String EVENT_DRIVER_PROCESS_BLOCKED = "driver.process_blocked";
+    public static final String EVENT_DRIVER_PROCESS_EXEC = "driver.process_exec";
 }

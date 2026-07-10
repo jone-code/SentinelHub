@@ -11,7 +11,8 @@ import { enforceDlp, dlpViolationsToEvents } from './enforcers/dlp.js';
 import { evaluateNac } from './enforcers/nac.js';
 import { scanCompliance } from './collectors/compliance.js';
 import { handleRemoteCommand } from './remote.js';
-import { ensureDriverDaemon, queryDriverViaNative, resolveDriverBin } from './driver-bridge.js';
+import { ensureDriverDaemon, queryDriverEvents, queryDriverViaNative, resolveDriverBin } from './driver-bridge.js';
+import { driverEventDedupKey, normalizeDriverEvents } from './driver-events.js';
 
 /**
  * PC client background service — orchestration layer.
@@ -27,6 +28,7 @@ export class ClientService {
     this.complianceTimer = null;
     this.dlpTimer = null;
     this.nacTimer = null;
+    this.driverEventTimer = null;
     this.running = false;
     /** @type {LocalServer | null} */
     this.localServer = null;
@@ -59,6 +61,8 @@ export class ClientService {
     this.reportedViolations = new Set();
     /** @type {Set<string>} */
     this.reportedDlpViolations = new Set();
+    /** @type {Set<string>} */
+    this.reportedDriverEvents = new Set();
     /** @type {object | null} */
     this.remoteSession = null;
     /** @type {Set<string>} */
@@ -166,6 +170,7 @@ export class ClientService {
     await this.runComplianceScan();
     await this.runDlpEnforcement();
     await this.runNacEvaluation();
+    await this.runDriverEventDrain();
 
     this.heartbeatTimer = setInterval(() => this.heartbeat(), this.config.heartbeatIntervalMs);
     this.assetTimer = setInterval(() => this.collectAndReportAssets(), this.config.assetCollectIntervalMs);
@@ -173,6 +178,10 @@ export class ClientService {
     this.complianceTimer = setInterval(() => this.runComplianceScan(), this.config.complianceIntervalMs);
     this.dlpTimer = setInterval(() => this.runDlpEnforcement(), this.config.dlpIntervalMs);
     this.nacTimer = setInterval(() => this.runNacEvaluation(), this.config.nacIntervalMs);
+    this.driverEventTimer = setInterval(
+      () => this.runDriverEventDrain(),
+      this.config.driverEventIntervalMs,
+    );
   }
 
   async stop() {
@@ -200,6 +209,10 @@ export class ClientService {
     if (this.nacTimer) {
       clearInterval(this.nacTimer);
       this.nacTimer = null;
+    }
+    if (this.driverEventTimer) {
+      clearInterval(this.driverEventTimer);
+      this.driverEventTimer = null;
     }
     if (this.localServer) {
       await this.localServer.stop();
@@ -346,6 +359,29 @@ export class ClientService {
       }
     } catch (err) {
       console.error('[sentinel-service] compliance report failed:', err.message);
+    }
+  }
+
+  async runDriverEventDrain() {
+    if (!this.state.clientId || !this.nativeBin) return;
+    try {
+      const batch = await queryDriverEvents(this.nativeBin, 50);
+      if (!batch) return;
+      const normalized = normalizeDriverEvents(batch);
+      const newEvents = [];
+      for (const event of normalized) {
+        const key = driverEventDedupKey(event);
+        if (this.reportedDriverEvents.has(key)) continue;
+        this.reportedDriverEvents.add(key);
+        newEvents.push(event);
+        const label = event.detail?.path ?? event.detail?.process ?? event.event_type;
+        console.warn(`[sentinel-service] driver event: ${event.event_type} ${label}`);
+      }
+      if (newEvents.length > 0) {
+        await this.reportEvents(newEvents);
+      }
+    } catch (err) {
+      console.error('[sentinel-service] driver event drain failed:', err.message);
     }
   }
 

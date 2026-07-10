@@ -69,21 +69,19 @@ docker compose up -d
 
 启用 `REMOTE_TURN_SECRET` 后，后端为每次 `rtc-config` 请求生成临时 username/credential。
 
-## 内核驱动（phase 3）
+## 内核驱动（phase 4）
 
-| 平台 | 能力 |
+| 组件 | 能力 |
 |------|------|
-| Linux kmod v3 | 事件 ring buffer；新增 `PROCESS_EXEC` / `PROCESS_BLOCK` 事件类型 |
-| Linux daemon | **fanotify** 文件钩子 + **process_block** `/proc` 进程监视器 |
-| Linux bpf | 可选 LSM BPF `bprm_check_security`（`linux/bpf/`） |
-| Windows | minifilter **策略缓存** + PreCreate **路径阻断**（`SENTINEL_MSG_SET_POLICY`） |
+| sentinel-native | `driver events --json` — 拉取 daemon 监视器事件 + 排空 kmod ring |
+| Node service | `runDriverEventDrain()` 每 3s 轮询，经 `POST /report/events` 写入审计 |
+| 事件类型 | `driver.file_open/blocked`、`driver.process_exec/blocked` |
+| 后端 | 复用 `SoftwareService.ingestEvents` → `client_events` + `audit_logs` |
 
-Daemon IPC：`get_events`（`file_events` + `process_events`）、`drain_kernel_events`。
-
-`push_policy` 同时写入 kmod ioctl 与 daemon socket，确保 fanotify/process_block 同步更新。
+配置：`CLIENT_DRIVER_EVENT_INTERVAL_SEC`（默认 3）。
 
 ## 后续增强
 
-1. 内核事件实时推送至 Node 服务 / 后端审计（phase 4）
-2. Windows USB 写入阻断
-3. BPF map 与策略 JSON 自动同步
+1. Windows USB 写入阻断
+2. BPF map 与策略 JSON 自动同步
+3. ClickHouse 审计冷存储

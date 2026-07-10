@@ -75,11 +75,20 @@ JSON-line over Unix socket:
 
 `get_events` returns `{ file_events, process_events }`.
 
+### Native CLI
+
+```bash
+sentinel-native driver events --limit 50 --json
+```
+
+Node service polls this every `CLIENT_DRIVER_EVENT_INTERVAL_SEC` (default 3) and reports via `POST /api/client/v1/service/report/events`.
+
 ## Phase roadmap
 
 | Phase | Linux | Windows |
 |-------|-------|---------|
 | **1** | Char device + policy ioctl | Minifilter register + pre-create stub |
 | **2** | fanotify file hooks + kernel event ring | FltCreateCommunicationPort skeleton |
-| **3 (current)** | process_block watcher + LSM BPF skeleton | Policy cache + PreCreate path deny |
-| 4 | Event streaming to Node service | USB write blocking |
+| **3** | process_block watcher + LSM BPF skeleton | Policy cache + PreCreate path deny |
+| **4 (current)** | Event stream → Node service → backend audit | (userspace client TBD) |
+| 5 | BPF map auto-sync | USB write blocking |

@@ -18,6 +18,8 @@ export function loadConfig() {
     complianceIntervalMs: parseInt(process.env.CLIENT_COMPLIANCE_INTERVAL_SEC || '300', 10) * 1000,
     dlpIntervalMs: parseInt(process.env.CLIENT_DLP_INTERVAL_SEC || '120', 10) * 1000,
     nacIntervalMs: parseInt(process.env.CLIENT_NAC_INTERVAL_SEC || '120', 10) * 1000,
+    driverEventIntervalMs: parseInt(process.env.CLIENT_DRIVER_EVENT_INTERVAL_SEC || '3', 10) * 1000,
+    driverBin: process.env.SENTINEL_DRIVER_BIN || '',
     remoteCaptureWidth: parseInt(process.env.REMOTE_CAPTURE_WIDTH || '1280', 10),
     remoteCaptureHeight: parseInt(process.env.REMOTE_CAPTURE_HEIGHT || '720', 10),
     remoteCaptureFps: parseInt(process.env.REMOTE_CAPTURE_FPS || '10', 10),
