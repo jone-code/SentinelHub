@@ -87,7 +87,7 @@ export async function queryDriverViaNative(nativeBin) {
  * @param {number} [limit]
  */
 export async function queryDriverEvents(nativeBin, limit = 50) {
-  if (!nativeBin || process.platform === 'win32') {
+  if (!nativeBin) {
     return null;
   }
   try {

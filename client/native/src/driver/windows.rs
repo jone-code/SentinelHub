@@ -6,12 +6,23 @@ const SENTINEL_POLICY_MAX: usize = 4096;
 mod imp {
     use super::SENTINEL_POLICY_MAX;
     use crate::DriverStatus;
+    use serde_json::{json, Value};
     use std::ffi::c_void;
     use std::ptr;
 
     const SENTINEL_MSG_SET_POLICY: u32 = 1;
     const SENTINEL_MSG_GET_STATUS: u32 = 2;
+    const SENTINEL_MSG_DRAIN_EVENTS: u32 = 3;
+    const SENTINEL_EVENT_PATH_MAX: usize = 256;
     const HRESULT_S_OK: i32 = 0;
+
+    #[repr(C)]
+    struct SentinelEvent {
+        type_: u32,
+        pid: u32,
+        blocked: u32,
+        path: [u8; SENTINEL_EVENT_PATH_MAX],
+    }
 
     #[link(name = "fltuser")]
     extern "system" {
@@ -128,11 +139,64 @@ mod imp {
                 "file_hook".into(),
                 "usb_block".into(),
                 "process_block".into(),
+                "event_ring".into(),
             ]),
             socket_path: String::new(),
         })
     }
+
+    fn path_from_bytes(path: &[u8]) -> String {
+        let end = path.iter().position(|&b| b == 0).unwrap_or(path.len());
+        String::from_utf8_lossy(&path[..end]).into_owned()
+    }
+
+    pub fn drain_events() -> Vec<Value> {
+        let Some(port) = connect_port() else {
+            return Vec::new();
+        };
+
+        let mut in_buf = [0u8; 8];
+        in_buf[0..4].copy_from_slice(&SENTINEL_MSG_DRAIN_EVENTS.to_le_bytes());
+
+        let out_cap = 4 + 64 * std::mem::size_of::<SentinelEvent>();
+        let mut out_buf = vec![0u8; out_cap];
+        let mut bytes_returned = 0u32;
+        let hr = unsafe {
+            FilterSendMessage(
+                port,
+                in_buf.as_ptr() as *const c_void,
+                8,
+                out_buf.as_mut_ptr() as *mut c_void,
+                out_cap as u32,
+                &mut bytes_returned,
+            )
+        };
+        close_port(port);
+        if hr != HRESULT_S_OK || bytes_returned < 4 {
+            return Vec::new();
+        }
+
+        let count = u32::from_le_bytes(out_buf[0..4].try_into().unwrap()) as usize;
+        let mut events = Vec::with_capacity(count);
+        let mut offset = 4usize;
+        for _ in 0..count {
+            if offset + std::mem::size_of::<SentinelEvent>() > bytes_returned as usize {
+                break;
+            }
+            let raw = unsafe {
+                ptr::read_unaligned(out_buf.as_ptr().add(offset) as *const SentinelEvent)
+            };
+            offset += std::mem::size_of::<SentinelEvent>();
+            events.push(json!({
+                "type": raw.type_,
+                "pid": raw.pid,
+                "blocked": raw.blocked != 0,
+                "path": path_from_bytes(&raw.path),
+            }));
+        }
+        events
+    }
 }
 
 #[cfg(target_os = "windows")]
-pub use imp::{probe, push_policy};
+pub use imp::{drain_events, probe, push_policy};

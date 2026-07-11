@@ -69,3 +69,10 @@ sentinelhub:
       subject: ${AUDIT_NATS_SUBJECT:sentinel.audit.events}
       stream: ${AUDIT_NATS_STREAM:SENTINEL_AUDIT}
       durable: ${AUDIT_NATS_DURABLE:audit-writer}
+  client-events:
+    nats:
+      enabled: ${CLIENT_EVENTS_NATS_ENABLED:false}
+      url: ${NATS_URL:nats://localhost:4222}
+      subject: ${CLIENT_EVENTS_NATS_SUBJECT:sentinel.client.events}
+      stream: ${CLIENT_EVENTS_NATS_STREAM:SENTINEL_CLIENT_EVENTS}
+      durable: ${CLIENT_EVENTS_NATS_DURABLE:client-events-writer}

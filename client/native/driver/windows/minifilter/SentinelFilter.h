@@ -17,6 +17,22 @@
 
 #define SENTINEL_MSG_SET_POLICY  1
 #define SENTINEL_MSG_GET_STATUS  2
+#define SENTINEL_MSG_DRAIN_EVENTS 3
+
+#define SENTINEL_EVENT_PATH_MAX  256
+#define SENTINEL_EVENT_RING_SIZE 64
+
+#define SENTINEL_EVENT_FILE_OPEN       1
+#define SENTINEL_EVENT_FILE_BLOCK      2
+#define SENTINEL_EVENT_PROCESS_EXEC    3
+#define SENTINEL_EVENT_PROCESS_BLOCK   4
+
+typedef struct _SENTINEL_EVENT {
+    ULONG Type;
+    ULONG Pid;
+    ULONG Blocked;
+    CHAR  Path[SENTINEL_EVENT_PATH_MAX];
+} SENTINEL_EVENT, *PSENTINEL_EVENT;
 
 typedef struct _SENTINEL_PORT_MESSAGE {
     ULONG Type;
@@ -79,3 +95,13 @@ BOOLEAN SentinelPathMatchesRule(
 BOOLEAN SentinelStrContains(
     _In_ PCSTR Haystack,
     _In_ PCSTR Needle);
+
+VOID SentinelPushEvent(
+    _In_ ULONG Type,
+    _In_ ULONG Pid,
+    _In_ ULONG Blocked,
+    _In_opt_ PCUNICODE_STRING Path);
+
+ULONG SentinelDrainEvents(
+    _Out_writes_(MaxEvents) PSENTINEL_EVENT Events,
+    _In_ ULONG MaxEvents);

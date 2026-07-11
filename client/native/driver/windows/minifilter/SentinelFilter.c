@@ -9,6 +9,11 @@ PFLT_PORT g_sentinel_client_port = NULL;
 static SENTINEL_POLICY_CACHE gPolicyCache;
 static KSPIN_LOCK gPolicyLock;
 
+static SENTINEL_EVENT gEventRing[SENTINEL_EVENT_RING_SIZE];
+static ULONG gEventHead;
+static ULONG gEventTail;
+static KSPIN_LOCK gEventLock;
+
 static const FLT_OPERATION_REGISTRATION callbacks[] = {
     { IRP_MJ_CREATE, 0, SentinelPreCreate, NULL },
     { IRP_MJ_WRITE, 0, SentinelPreWrite, NULL },
@@ -81,6 +86,18 @@ static NTSTATUS SentinelMessageNotify(
         break;
     case SENTINEL_MSG_GET_STATUS:
         break;
+    case SENTINEL_MSG_DRAIN_EVENTS:
+        if (OutputBuffer && OutputBufferLength >= sizeof(ULONG)) {
+            ULONG maxEvents = (OutputBufferLength - sizeof(ULONG)) / sizeof(SENTINEL_EVENT);
+            PSENTINEL_EVENT outEvents = (PSENTINEL_EVENT)((PUCHAR)OutputBuffer + sizeof(ULONG));
+            ULONG drained = SentinelDrainEvents(outEvents, maxEvents);
+            *(PULONG)OutputBuffer = drained;
+            *ReturnOutputBufferLength = sizeof(ULONG) + drained * sizeof(SENTINEL_EVENT);
+        } else {
+            *ReturnOutputBufferLength = 0;
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        return status;
     default:
         status = STATUS_NOT_SUPPORTED;
         break;
@@ -132,7 +149,10 @@ NTSTATUS DriverEntry(
     UNREFERENCED_PARAMETER(RegistryPath);
 
     KeInitializeSpinLock(&gPolicyLock);
+    KeInitializeSpinLock(&gEventLock);
     RtlZeroMemory(&gPolicyCache, sizeof(gPolicyCache));
+    gEventHead = 0;
+    gEventTail = 0;
 
     status = FltRegisterFilter(DriverObject, &filter_registration, &g_sentinel_filter);
     if (!NT_SUCCESS(status)) {
@@ -228,13 +248,16 @@ FLT_PREOP_CALLBACK_STATUS SentinelPreCreate(
     }
     KeReleaseSpinLock(&gPolicyLock, oldIrql);
 
-    FltReleaseFileNameInformation(nameInfo);
-
     if (deny) {
+        HANDLE pid = PsGetCurrentProcessId();
+        SentinelPushEvent(SENTINEL_EVENT_FILE_BLOCK, HandleToUlong(pid), 1, &nameInfo->Name);
+        FltReleaseFileNameInformation(nameInfo);
         Data->IoStatus.Status = STATUS_ACCESS_DENIED;
         Data->IoStatus.Information = 0;
         return FLT_PREOP_COMPLETE;
     }
+
+    FltReleaseFileNameInformation(nameInfo);
 
     return FLT_PREOP_SUCCESS_NO_CALLBACK;
 }
@@ -247,6 +270,8 @@ FLT_PREOP_CALLBACK_STATUS SentinelPreWrite(
     KIRQL oldIrql;
     BOOLEAN usbBlock = FALSE;
     BOOLEAN removable = FALSE;
+    PFLT_FILE_NAME_INFORMATION nameInfo = NULL;
+    NTSTATUS status;
 
     UNREFERENCED_PARAMETER(CompletionContext);
 
@@ -264,6 +289,18 @@ FLT_PREOP_CALLBACK_STATUS SentinelPreWrite(
 
     removable = SentinelVolumeIsRemovable(FltObjects);
     if (removable) {
+        HANDLE pid = PsGetCurrentProcessId();
+        status = FltGetFileNameInformation(
+            Data,
+            FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT,
+            &nameInfo);
+        if (NT_SUCCESS(status)) {
+            FltParseFileNameInformation(nameInfo);
+            SentinelPushEvent(SENTINEL_EVENT_FILE_BLOCK, HandleToUlong(pid), 1, &nameInfo->Name);
+            FltReleaseFileNameInformation(nameInfo);
+        } else {
+            SentinelPushEvent(SENTINEL_EVENT_FILE_BLOCK, HandleToUlong(pid), 1, NULL);
+        }
         Data->IoStatus.Status = STATUS_ACCESS_DENIED;
         Data->IoStatus.Information = 0;
         return FLT_PREOP_COMPLETE;
@@ -476,4 +513,68 @@ BOOLEAN SentinelPathMatchesRule(_In_ PCUNICODE_STRING Path, _In_ PCWSTR Pattern)
 BOOLEAN SentinelStrContains(_In_ PCSTR Haystack, _In_ PCSTR Needle)
 {
     return (Haystack && Needle && strstr(Haystack, Needle) != NULL);
+}
+
+VOID SentinelPushEvent(
+    _In_ ULONG Type,
+    _In_ ULONG Pid,
+    _In_ ULONG Blocked,
+    _In_opt_ PCUNICODE_STRING Path)
+{
+    SENTINEL_EVENT ev;
+    KIRQL oldIrql;
+    ULONG next;
+
+    RtlZeroMemory(&ev, sizeof(ev));
+    ev.Type = Type;
+    ev.Pid = Pid;
+    ev.Blocked = Blocked;
+
+    if (Path && Path->Buffer && Path->Length > 0) {
+        ANSI_STRING ansi;
+        UNICODE_STRING uPath;
+        NTSTATUS status;
+
+        uPath = *Path;
+        ansi.Buffer = ev.Path;
+        ansi.Length = 0;
+        ansi.MaximumLength = SENTINEL_EVENT_PATH_MAX;
+        status = RtlUnicodeStringToAnsiString(&ansi, &uPath, FALSE);
+        if (!NT_SUCCESS(status)) {
+            ULONG copyLen = Path->Length;
+            if (copyLen > SENTINEL_EVENT_PATH_MAX - 1) {
+                copyLen = SENTINEL_EVENT_PATH_MAX - 1;
+            }
+            RtlCopyMemory(ev.Path, Path->Buffer, copyLen);
+            ev.Path[copyLen] = '\0';
+        }
+    }
+
+    KeAcquireSpinLock(&gEventLock, &oldIrql);
+    next = (gEventHead + 1) % SENTINEL_EVENT_RING_SIZE;
+    if (next != gEventTail) {
+        gEventRing[gEventHead] = ev;
+        gEventHead = next;
+    }
+    KeReleaseSpinLock(&gEventLock, oldIrql);
+}
+
+ULONG SentinelDrainEvents(
+    _Out_writes_(MaxEvents) PSENTINEL_EVENT Events,
+    _In_ ULONG MaxEvents)
+{
+    ULONG count = 0;
+    KIRQL oldIrql;
+
+    if (!Events || MaxEvents == 0) {
+        return 0;
+    }
+
+    KeAcquireSpinLock(&gEventLock, &oldIrql);
+    while (gEventTail != gEventHead && count < MaxEvents) {
+        Events[count++] = gEventRing[gEventTail];
+        gEventTail = (gEventTail + 1) % SENTINEL_EVENT_RING_SIZE;
+    }
+    KeReleaseSpinLock(&gEventLock, oldIrql);
+    return count;
 }

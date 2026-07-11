@@ -92,10 +92,20 @@ docker compose up -d
 |------|------|
 | `AUDIT_CH_ENABLED` | ClickHouse 冷热双写 |
 | `AUDIT_NATS_ENABLED` | 审计走 NATS 异步写入 |
+| `CLIENT_EVENTS_NATS_ENABLED` | 客户端事件走 NATS 异步摄入 |
 | `NATS_URL` | NATS 连接地址 |
+
+## 平台增强（phase 7）
+
+| 组件 | 能力 |
+|------|------|
+| NATS | `client_events` 异步摄入（JetStream `sentinel.client.events` → MySQL + ClickHouse + 审计） |
+| Windows minifilter | 阻断事件环形缓冲 + `SENTINEL_MSG_DRAIN_EVENTS` 用户态拉取 |
+| ClickHouse | `audit_logs` + `client_events` 跨表联合时间线（`GET /api/admin/v1/timeline?storage=cold`） |
+| 管理台 | 安全时间线页面（冷存储统一视图） |
 
 ## 后续增强
 
-1. client_events NATS 异步摄入
-2. Windows 驱动事件上报
-3. ClickHouse 跨表联合查询
+1. Linux/Windows 驱动事件 WebSocket 实时推送
+2. ClickHouse 热存储联合查询降级策略
+3. NATS 批量摄入与背压控制
