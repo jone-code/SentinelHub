@@ -34,6 +34,7 @@ export default function Timeline() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [source, setSource] = useState<string | undefined>();
+  const [storage, setStorage] = useState<'hot' | 'cold' | 'auto'>('auto');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -42,7 +43,7 @@ export default function Timeline() {
         page,
         page_size: pageSize,
         source: source || undefined,
-        storage: 'cold',
+        storage,
       },
     })
       .then((res) => {
@@ -54,7 +55,7 @@ export default function Timeline() {
         setTotal(0);
       })
       .finally(() => setLoading(false));
-  }, [page, pageSize, source]);
+  }, [page, pageSize, source, storage]);
 
   useEffect(() => {
     load();
@@ -110,13 +111,26 @@ export default function Timeline() {
             { value: 'client_event', label: '客户端事件' },
           ]}
         />
+        <Select
+          style={{ width: 200 }}
+          value={storage}
+          onChange={(v) => {
+            setPage(1);
+            setStorage(v);
+          }}
+          options={[
+            { value: 'auto', label: '自动 (冷优先/热降级)' },
+            { value: 'hot', label: '热存储 (MySQL)' },
+            { value: 'cold', label: '冷存储 (ClickHouse)' },
+          ]}
+        />
       </Space>
       <Table
         columns={columns}
         dataSource={data}
         rowKey="id"
         loading={loading}
-        locale={{ emptyText: '暂无冷存储时间线记录（需启用 ClickHouse）' }}
+        locale={{ emptyText: '暂无时间线记录' }}
         pagination={{
           current: page,
           pageSize,

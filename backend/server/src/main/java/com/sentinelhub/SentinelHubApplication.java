@@ -3,6 +3,7 @@ package com.sentinelhub;
 import com.sentinelhub.config.AuditClickHouseProperties;
 import com.sentinelhub.config.AuditNatsProperties;
 import com.sentinelhub.config.ClientEventNatsProperties;
+import com.sentinelhub.config.TimelineProperties;
 import com.sentinelhub.config.AiLlmProperties;
 import com.sentinelhub.config.JwtProperties;
 import com.sentinelhub.config.MinioProperties;
@@ -13,7 +14,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @SpringBootApplication(scanBasePackages = "com.sentinelhub")
-@EnableConfigurationProperties({JwtProperties.class, SeedProperties.class, MinioProperties.class, AiLlmProperties.class, RemoteRtcProperties.class, AuditClickHouseProperties.class, AuditNatsProperties.class, ClientEventNatsProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, SeedProperties.class, MinioProperties.class, AiLlmProperties.class, RemoteRtcProperties.class, AuditClickHouseProperties.class, AuditNatsProperties.class, ClientEventNatsProperties.class, TimelineProperties.class})
 public class SentinelHubApplication {
 
     public static void main(String[] args) {

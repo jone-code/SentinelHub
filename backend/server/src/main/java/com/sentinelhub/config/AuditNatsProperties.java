@@ -8,7 +8,12 @@ public record AuditNatsProperties(
         String url,
         String subject,
         String stream,
-        String durable
+        String durable,
+        int batchSize,
+        int maxInFlight,
+        int fetchTimeoutMs,
+        int backlogBackoffMs,
+        long maxStreamBytes
 ) {
     public AuditNatsProperties {
         if (url == null || url.isBlank()) {
@@ -22,6 +27,18 @@ public record AuditNatsProperties(
         }
         if (durable == null || durable.isBlank()) {
             durable = "audit-writer";
+        }
+        if (batchSize <= 0) {
+            batchSize = 50;
+        }
+        if (maxInFlight <= 0) {
+            maxInFlight = 2;
+        }
+        if (fetchTimeoutMs <= 0) {
+            fetchTimeoutMs = 2000;
+        }
+        if (backlogBackoffMs <= 0) {
+            backlogBackoffMs = 500;
         }
     }
 }

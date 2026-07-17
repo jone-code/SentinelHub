@@ -40,13 +40,13 @@ public class ClickHouseAuditRepository {
         return properties.enabled();
     }
 
-    public void insert(String tenantId, String actorType, String actorId, String action,
+    public void insert(String id, String tenantId, String actorType, String actorId, String action,
                        String resource, String resourceId, String detailJson, String ip) {
         if (!properties.enabled()) {
             return;
         }
         Map<String, Object> row = new LinkedHashMap<>();
-        row.put("id", UUID.randomUUID().toString());
+        row.put("id", id);
         row.put("tenant_id", tenantId);
         row.put("actor_type", actorType);
         row.put("actor_id", actorId);
@@ -61,6 +61,37 @@ public class ClickHouseAuditRepository {
             postQuery(query, body);
         } catch (Exception e) {
             log.warn("ClickHouse audit insert failed: {}", e.getMessage());
+        }
+    }
+
+    public void insert(String tenantId, String actorType, String actorId, String action,
+                       String resource, String resourceId, String detailJson, String ip) {
+        insert(UUID.randomUUID().toString(), tenantId, actorType, actorId, action, resource, resourceId, detailJson, ip);
+    }
+
+    public void batchInsert(List<AuditRepository.AuditRow> rows) {
+        if (!properties.enabled() || rows == null || rows.isEmpty()) {
+            return;
+        }
+        try {
+            StringBuilder body = new StringBuilder();
+            for (AuditRepository.AuditRow row : rows) {
+                Map<String, Object> map = new LinkedHashMap<>();
+                map.put("id", row.id());
+                map.put("tenant_id", row.tenantId());
+                map.put("actor_type", row.actorType());
+                map.put("actor_id", row.actorId());
+                map.put("action", row.action());
+                map.put("resource", row.resource());
+                map.put("resource_id", row.resourceId());
+                map.put("detail", row.detailJson());
+                map.put("ip_address", row.ip());
+                body.append(objectMapper.writeValueAsString(map)).append('\n');
+            }
+            String query = "INSERT INTO " + properties.database() + ".audit_logs FORMAT JSONEachRow";
+            postQuery(query, body.toString());
+        } catch (Exception e) {
+            log.warn("ClickHouse audit batch insert failed: {}", e.getMessage());
         }
     }
 

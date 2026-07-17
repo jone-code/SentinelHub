@@ -17,13 +17,52 @@ public class AuditRepository {
         this.jdbc = jdbc;
     }
 
-    public void insert(String tenantId, String actorType, String actorId, String action,
+    public void insert(String id, String tenantId, String actorType, String actorId, String action,
                        String resource, String resourceId, String detailJson, String ip) {
         jdbc.update(
                 "INSERT INTO audit_logs (id, tenant_id, actor_type, actor_id, action, resource, resource_id, detail, ip_address) "
                         + "VALUES (?,?,?,?,?,?,?,CAST(? AS JSON),?)",
-                UUID.randomUUID().toString(), tenantId, actorType, actorId, action, resource, resourceId, detailJson, ip);
+                id, tenantId, actorType, actorId, action, resource, resourceId, detailJson, ip);
     }
+
+    public void insert(String tenantId, String actorType, String actorId, String action,
+                       String resource, String resourceId, String detailJson, String ip) {
+        insert(UUID.randomUUID().toString(), tenantId, actorType, actorId, action, resource, resourceId, detailJson, ip);
+    }
+
+    public void batchInsert(List<AuditRow> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        jdbc.batchUpdate(
+                "INSERT INTO audit_logs (id, tenant_id, actor_type, actor_id, action, resource, resource_id, detail, ip_address) "
+                        + "VALUES (?,?,?,?,?,?,?,CAST(? AS JSON),?)",
+                rows,
+                rows.size(),
+                (ps, row) -> {
+                    ps.setString(1, row.id());
+                    ps.setString(2, row.tenantId());
+                    ps.setString(3, row.actorType());
+                    ps.setString(4, row.actorId());
+                    ps.setString(5, row.action());
+                    ps.setString(6, row.resource());
+                    ps.setString(7, row.resourceId());
+                    ps.setString(8, row.detailJson());
+                    ps.setString(9, row.ip());
+                });
+    }
+
+    public record AuditRow(
+            String id,
+            String tenantId,
+            String actorType,
+            String actorId,
+            String action,
+            String resource,
+            String resourceId,
+            String detailJson,
+            String ip
+    ) {}
 
     public List<Map<String, Object>> list(String tenantId, int limit, int offset, String actionFilter) {
         StringBuilder sql = new StringBuilder(

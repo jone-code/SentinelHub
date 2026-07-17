@@ -4,14 +4,17 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentinelhub.config.ClientEventNatsProperties;
+import com.sentinelhub.module.audit.AuditRepository;
 import com.sentinelhub.module.audit.AuditService;
 import com.sentinelhub.module.zerotrust.ZerotrustService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class SoftwareService {
@@ -25,6 +28,7 @@ public class SoftwareService {
     private final ZerotrustService zerotrustService;
     private final NatsClientEventPublisher natsClientEventPublisher;
     private final ClientEventNatsProperties clientEventNatsProperties;
+    private final AdminEventPushService adminEventPushService;
 
     public SoftwareService(ClientEventRepository eventRepository,
                            ClickHouseClientEventRepository clickHouseClientEventRepository,
@@ -32,7 +36,8 @@ public class SoftwareService {
                            ObjectMapper objectMapper,
                            ZerotrustService zerotrustService,
                            NatsClientEventPublisher natsClientEventPublisher,
-                           ClientEventNatsProperties clientEventNatsProperties) {
+                           ClientEventNatsProperties clientEventNatsProperties,
+                           AdminEventPushService adminEventPushService) {
         this.eventRepository = eventRepository;
         this.clickHouseClientEventRepository = clickHouseClientEventRepository;
         this.auditService = auditService;
@@ -40,6 +45,7 @@ public class SoftwareService {
         this.zerotrustService = zerotrustService;
         this.natsClientEventPublisher = natsClientEventPublisher;
         this.clientEventNatsProperties = clientEventNatsProperties;
+        this.adminEventPushService = adminEventPushService;
     }
 
     @SuppressWarnings("unchecked")
@@ -74,10 +80,54 @@ public class SoftwareService {
 
     void writeSync(String tenantId, String deviceId, String clientId, String eventType,
                    String severity, String detailJson) {
-        eventRepository.insert(tenantId, deviceId, eventType, severity, detailJson);
-        clickHouseClientEventRepository.insert(tenantId, deviceId, eventType, severity, detailJson);
+        String eventId = UUID.randomUUID().toString();
+        eventRepository.insert(eventId, tenantId, deviceId, eventType, severity, detailJson);
+        clickHouseClientEventRepository.insert(eventId, tenantId, deviceId, eventType, severity, detailJson);
         Map<String, Object> detail = parseDetail(detailJson);
         auditService.log(tenantId, "agent", clientId, eventType, "device", deviceId, detail, null);
+        adminEventPushService.pushDriverEvent(
+                tenantId, eventId, deviceId, clientId, eventType, severity, detail);
+    }
+
+    void writeSyncBatch(List<ClientEventMessage> events) {
+        if (events == null || events.isEmpty()) {
+            return;
+        }
+        List<ClientEventRepository.ClientEventRow> rows = new ArrayList<>(events.size());
+        List<AuditRepository.AuditRow> auditRows = new ArrayList<>(events.size());
+        for (ClientEventMessage event : events) {
+            String eventId = event.id() != null ? event.id() : UUID.randomUUID().toString();
+            rows.add(new ClientEventRepository.ClientEventRow(
+                    eventId, event.tenantId(), event.deviceId(), event.eventType(),
+                    event.severity(), event.detailJson()));
+            auditRows.add(new AuditRepository.AuditRow(
+                    UUID.randomUUID().toString(),
+                    event.tenantId(),
+                    "agent",
+                    event.clientId(),
+                    event.eventType(),
+                    "device",
+                    event.deviceId(),
+                    event.detailJson(),
+                    null));
+        }
+        eventRepository.batchInsert(rows);
+        clickHouseClientEventRepository.batchInsert(rows);
+        auditService.writeSyncBatch(auditRows);
+        for (int i = 0; i < events.size(); i++) {
+            ClientEventMessage event = events.get(i);
+            ClientEventRepository.ClientEventRow row = rows.get(i);
+            if (event.eventType() != null && event.eventType().startsWith("driver.")) {
+                adminEventPushService.pushDriverEvent(
+                        event.tenantId(),
+                        row.id(),
+                        event.deviceId(),
+                        event.clientId(),
+                        event.eventType(),
+                        event.severity(),
+                        parseDetail(event.detailJson()));
+            }
+        }
     }
 
     public List<Map<String, Object>> listEventsForAdmin(String tenantId, int page, int pageSize,

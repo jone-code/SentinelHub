@@ -40,12 +40,12 @@ public class ClickHouseClientEventRepository {
         return properties.enabled();
     }
 
-    public void insert(String tenantId, String deviceId, String eventType, String severity, String detailJson) {
+    public void insert(String id, String tenantId, String deviceId, String eventType, String severity, String detailJson) {
         if (!properties.enabled()) {
             return;
         }
         Map<String, Object> row = new LinkedHashMap<>();
-        row.put("id", UUID.randomUUID().toString());
+        row.put("id", id);
         row.put("tenant_id", tenantId);
         row.put("device_id", deviceId);
         row.put("event_type", eventType);
@@ -57,6 +57,33 @@ public class ClickHouseClientEventRepository {
             postQuery(query, body);
         } catch (Exception e) {
             log.warn("ClickHouse client_events insert failed: {}", e.getMessage());
+        }
+    }
+
+    public void insert(String tenantId, String deviceId, String eventType, String severity, String detailJson) {
+        insert(UUID.randomUUID().toString(), tenantId, deviceId, eventType, severity, detailJson);
+    }
+
+    public void batchInsert(List<ClientEventRepository.ClientEventRow> rows) {
+        if (!properties.enabled() || rows == null || rows.isEmpty()) {
+            return;
+        }
+        try {
+            StringBuilder body = new StringBuilder();
+            for (ClientEventRepository.ClientEventRow row : rows) {
+                Map<String, Object> map = new LinkedHashMap<>();
+                map.put("id", row.id());
+                map.put("tenant_id", row.tenantId());
+                map.put("device_id", row.deviceId());
+                map.put("event_type", row.eventType());
+                map.put("severity", row.severity());
+                map.put("detail", row.detailJson());
+                body.append(objectMapper.writeValueAsString(map)).append('\n');
+            }
+            String query = "INSERT INTO " + properties.database() + ".client_events FORMAT JSONEachRow";
+            postQuery(query, body.toString());
+        } catch (Exception e) {
+            log.warn("ClickHouse client_events batch insert failed: {}", e.getMessage());
         }
     }
 

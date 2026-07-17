@@ -17,12 +17,44 @@ public class ClientEventRepository {
         this.jdbc = jdbc;
     }
 
-    public void insert(String tenantId, String deviceId, String eventType, String severity, String detailJson) {
+    public void insert(String id, String tenantId, String deviceId, String eventType, String severity, String detailJson) {
         jdbc.update(
                 "INSERT INTO client_events (id, tenant_id, device_id, event_type, severity, detail) "
                         + "VALUES (?,?,?,?,?,CAST(? AS JSON))",
-                UUID.randomUUID().toString(), tenantId, deviceId, eventType, severity, detailJson);
+                id, tenantId, deviceId, eventType, severity, detailJson);
     }
+
+    public void insert(String tenantId, String deviceId, String eventType, String severity, String detailJson) {
+        insert(UUID.randomUUID().toString(), tenantId, deviceId, eventType, severity, detailJson);
+    }
+
+    public void batchInsert(List<ClientEventRow> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        jdbc.batchUpdate(
+                "INSERT INTO client_events (id, tenant_id, device_id, event_type, severity, detail) "
+                        + "VALUES (?,?,?,?,?,CAST(? AS JSON))",
+                rows,
+                rows.size(),
+                (ps, row) -> {
+                    ps.setString(1, row.id());
+                    ps.setString(2, row.tenantId());
+                    ps.setString(3, row.deviceId());
+                    ps.setString(4, row.eventType());
+                    ps.setString(5, row.severity());
+                    ps.setString(6, row.detailJson());
+                });
+    }
+
+    public record ClientEventRow(
+            String id,
+            String tenantId,
+            String deviceId,
+            String eventType,
+            String severity,
+            String detailJson
+    ) {}
 
     public List<Map<String, Object>> listByTenant(String tenantId, int limit, int offset,
                                                    String eventTypeFilter, String severityFilter) {

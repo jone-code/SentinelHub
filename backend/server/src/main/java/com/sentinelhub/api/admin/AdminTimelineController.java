@@ -27,7 +27,7 @@ public class AdminTimelineController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(name = "page_size", defaultValue = "20") int pageSize,
             @RequestParam(required = false) String source,
-            @RequestParam(defaultValue = "cold") String storage) {
+            @RequestParam(defaultValue = "auto") String storage) {
         TenantContext ctx = TenantContext.get();
         if (ctx == null || ctx.tenantId() == null) {
             throw new IllegalArgumentException("unauthorized");

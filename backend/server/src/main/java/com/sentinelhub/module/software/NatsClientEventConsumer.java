@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -48,7 +49,8 @@ public class NatsClientEventConsumer implements ApplicationRunner {
         Thread consumerThread = new Thread(this::runConsumer, "nats-client-events-consumer");
         consumerThread.setDaemon(true);
         consumerThread.start();
-        log.info("NATS async client_events consumer started (subject={})", properties.subject());
+        log.info("NATS async client_events consumer started (subject={}, batch={})",
+                properties.subject(), properties.batchSize());
     }
 
     private void runConsumer() {
@@ -68,11 +70,17 @@ public class NatsClientEventConsumer implements ApplicationRunner {
             JetStreamSubscription sub = js.subscribe(properties.subject(), pullOpts);
 
             while (!Thread.currentThread().isInterrupted()) {
-                sub.pull(10);
-                List<Message> messages = sub.fetch(10, Duration.ofSeconds(2));
-                for (Message msg : messages) {
-                    handleMessage(msg);
+                if (shouldBackoff(jsm)) {
+                    Thread.sleep(properties.backlogBackoffMs());
+                    continue;
                 }
+                int batchSize = properties.batchSize();
+                sub.pull(batchSize);
+                List<Message> messages = sub.fetch(batchSize, Duration.ofMillis(properties.fetchTimeoutMs()));
+                if (messages.isEmpty()) {
+                    continue;
+                }
+                handleBatch(messages);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -81,37 +89,52 @@ public class NatsClientEventConsumer implements ApplicationRunner {
         }
     }
 
+    private boolean shouldBackoff(JetStreamManagement jsm) {
+        if (properties.maxStreamBytes() <= 0) {
+            return false;
+        }
+        try {
+            long bytes = jsm.getStreamInfo(properties.stream()).getStreamState().getByteCount();
+            return bytes >= properties.maxStreamBytes();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private void ensureStream(JetStreamManagement jsm) throws Exception {
         try {
             jsm.getStreamInfo(properties.stream());
         } catch (Exception notFound) {
-            StreamConfiguration sc = StreamConfiguration.builder()
+            StreamConfiguration.Builder builder = StreamConfiguration.builder()
                     .name(properties.stream())
                     .subjects(properties.subject())
                     .storageType(StorageType.File)
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .build();
-            jsm.addStream(sc);
+                    .retentionPolicy(RetentionPolicy.Limits);
+            if (properties.maxStreamBytes() > 0) {
+                builder.maxBytes(properties.maxStreamBytes());
+            }
+            jsm.addStream(builder.build());
         }
     }
 
-    private void handleMessage(Message msg) {
+    private void handleBatch(List<Message> messages) {
+        List<ClientEventMessage> events = new ArrayList<>(messages.size());
         try {
-            String json = new String(msg.getData(), StandardCharsets.UTF_8);
-            ClientEventMessage event = objectMapper.readValue(json, ClientEventMessage.class);
-            softwareService.writeSync(
-                    event.tenantId(),
-                    event.deviceId(),
-                    event.clientId(),
-                    event.eventType(),
-                    event.severity(),
-                    event.detailJson());
-            msg.ack();
+            for (Message msg : messages) {
+                String json = new String(msg.getData(), StandardCharsets.UTF_8);
+                events.add(objectMapper.readValue(json, ClientEventMessage.class));
+            }
+            softwareService.writeSyncBatch(events);
+            for (Message msg : messages) {
+                msg.ack();
+            }
         } catch (Exception e) {
-            log.warn("NATS client_events message handling failed: {}", e.getMessage());
-            try {
-                msg.nak();
-            } catch (Exception ignored) {
+            log.warn("NATS client_events batch handling failed: {}", e.getMessage());
+            for (Message msg : messages) {
+                try {
+                    msg.nak();
+                } catch (Exception ignored) {
+                }
             }
         }
     }
