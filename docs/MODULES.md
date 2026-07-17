@@ -104,8 +104,25 @@ docker compose up -d
 | ClickHouse | `audit_logs` + `client_events` 跨表联合时间线（`GET /api/admin/v1/timeline?storage=cold`） |
 | 管理台 | 安全时间线页面（冷存储统一视图） |
 
+## 平台增强（phase 8）
+
+| 组件 | 能力 |
+|------|------|
+| WebSocket | 驱动事件实时推送至管理台（`WS /api/admin/v1/ws/events?token=`） |
+| 时间线 | MySQL 热存储联合查询 + `storage=auto` 冷优先热降级 |
+| NATS | 批量消费写入 + `maxAckPending` / stream 字节背压退避 |
+
+### 配置
+
+| 变量 | 说明 |
+|------|------|
+| `TIMELINE_FALLBACK_TO_HOT` | ClickHouse 不可用时降级 MySQL 时间线 |
+| `AUDIT_NATS_BATCH_SIZE` | 审计 NATS 批量拉取大小 |
+| `CLIENT_EVENTS_NATS_BATCH_SIZE` | 客户端事件 NATS 批量拉取大小 |
+| `*_NATS_MAX_STREAM_BYTES` | Stream 字节上限触发消费退避（0=禁用） |
+
 ## 后续增强
 
-1. Linux/Windows 驱动事件 WebSocket 实时推送
-2. ClickHouse 热存储联合查询降级策略
-3. NATS 批量摄入与背压控制
+1. 多实例 WebSocket 广播（Redis/NATS pub-sub）
+2. 时间线热存储增量同步至 ClickHouse
+3. NATS 死信队列与消费监控指标

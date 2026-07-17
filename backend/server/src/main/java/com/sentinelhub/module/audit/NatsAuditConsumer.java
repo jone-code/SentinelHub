@@ -21,7 +21,9 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 public class NatsAuditConsumer implements ApplicationRunner {
@@ -48,7 +50,8 @@ public class NatsAuditConsumer implements ApplicationRunner {
         Thread consumerThread = new Thread(this::runConsumer, "nats-audit-consumer");
         consumerThread.setDaemon(true);
         consumerThread.start();
-        log.info("NATS async audit consumer started (subject={})", properties.subject());
+        log.info("NATS async audit consumer started (subject={}, batch={})",
+                properties.subject(), properties.batchSize());
     }
 
     private void runConsumer() {
@@ -68,11 +71,17 @@ public class NatsAuditConsumer implements ApplicationRunner {
             JetStreamSubscription sub = js.subscribe(properties.subject(), pullOpts);
 
             while (!Thread.currentThread().isInterrupted()) {
-                sub.pull(10);
-                List<Message> messages = sub.fetch(10, Duration.ofSeconds(2));
-                for (Message msg : messages) {
-                    handleMessage(msg);
+                if (shouldBackoff(jsm)) {
+                    Thread.sleep(properties.backlogBackoffMs());
+                    continue;
                 }
+                int batchSize = properties.batchSize();
+                sub.pull(batchSize);
+                List<Message> messages = sub.fetch(batchSize, Duration.ofMillis(properties.fetchTimeoutMs()));
+                if (messages.isEmpty()) {
+                    continue;
+                }
+                handleBatch(messages);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -81,39 +90,63 @@ public class NatsAuditConsumer implements ApplicationRunner {
         }
     }
 
+    private boolean shouldBackoff(JetStreamManagement jsm) {
+        if (properties.maxStreamBytes() <= 0) {
+            return false;
+        }
+        try {
+            long bytes = jsm.getStreamInfo(properties.stream()).getStreamState().getByteCount();
+            return bytes >= properties.maxStreamBytes();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private void ensureStream(JetStreamManagement jsm) throws Exception {
         try {
             jsm.getStreamInfo(properties.stream());
         } catch (Exception notFound) {
-            StreamConfiguration sc = StreamConfiguration.builder()
+            StreamConfiguration.Builder builder = StreamConfiguration.builder()
                     .name(properties.stream())
                     .subjects(properties.subject())
                     .storageType(StorageType.File)
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .build();
-            jsm.addStream(sc);
+                    .retentionPolicy(RetentionPolicy.Limits);
+            if (properties.maxStreamBytes() > 0) {
+                builder.maxBytes(properties.maxStreamBytes());
+            }
+            jsm.addStream(builder.build());
         }
     }
 
-    private void handleMessage(Message msg) {
+    private void handleBatch(List<Message> messages) {
+        List<AuditRepository.AuditRow> rows = new ArrayList<>(messages.size());
         try {
-            String json = new String(msg.getData(), StandardCharsets.UTF_8);
-            AuditEventMessage event = objectMapper.readValue(json, AuditEventMessage.class);
-            auditService.writeSync(
-                    event.tenantId(),
-                    event.actorType(),
-                    event.actorId(),
-                    event.action(),
-                    event.resource(),
-                    event.resourceId(),
-                    event.detailJson(),
-                    event.ip());
-            msg.ack();
+            for (Message msg : messages) {
+                String json = new String(msg.getData(), StandardCharsets.UTF_8);
+                AuditEventMessage event = objectMapper.readValue(json, AuditEventMessage.class);
+                String id = event.id() != null ? event.id() : UUID.randomUUID().toString();
+                rows.add(new AuditRepository.AuditRow(
+                        id,
+                        event.tenantId(),
+                        event.actorType(),
+                        event.actorId(),
+                        event.action(),
+                        event.resource(),
+                        event.resourceId(),
+                        event.detailJson(),
+                        event.ip()));
+            }
+            auditService.writeSyncBatch(rows);
+            for (Message msg : messages) {
+                msg.ack();
+            }
         } catch (Exception e) {
-            log.warn("NATS audit message handling failed: {}", e.getMessage());
-            try {
-                msg.nak();
-            } catch (Exception ignored) {
+            log.warn("NATS audit batch handling failed: {}", e.getMessage());
+            for (Message msg : messages) {
+                try {
+                    msg.nak();
+                } catch (Exception ignored) {
+                }
             }
         }
     }

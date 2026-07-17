@@ -50,8 +50,17 @@ public class AuditService {
 
     void writeSync(String tenantId, String actorType, String actorId, String action,
                    String resource, String resourceId, String detailJson, String ip) {
-        auditRepository.insert(tenantId, actorType, actorId, action, resource, resourceId, detailJson, ip);
-        clickHouseAuditRepository.insert(tenantId, actorType, actorId, action, resource, resourceId, detailJson, ip);
+        String id = UUID.randomUUID().toString();
+        auditRepository.insert(id, tenantId, actorType, actorId, action, resource, resourceId, detailJson, ip);
+        clickHouseAuditRepository.insert(id, tenantId, actorType, actorId, action, resource, resourceId, detailJson, ip);
+    }
+
+    public void writeSyncBatch(List<AuditRepository.AuditRow> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        auditRepository.batchInsert(rows);
+        clickHouseAuditRepository.batchInsert(rows);
     }
 
     public List<Map<String, Object>> listForAdmin(String tenantId, int page, int pageSize,

@@ -1,6 +1,7 @@
 import { Select, Space, Table, Tag } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiEnvelope, PageData } from '../../api/client';
+import { DriverEventPayload, useDriverEventSocket } from '../../hooks/useDriverEventSocket';
 
 interface EventRow {
   id: string;
@@ -61,6 +62,28 @@ export default function Events() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const liveEnabled = storage === 'hot' && (!eventType || eventType.startsWith('driver.'));
+
+  useDriverEventSocket(liveEnabled, (event: DriverEventPayload) => {
+    if (severity && event.severity !== severity) return;
+    if (eventType && !event.event_type.startsWith(eventType.replace(/\.$/, ''))
+        && !event.event_type.includes(eventType)) return;
+    setData((prev) => {
+      if (prev.some((row) => row.id === event.id)) return prev;
+      const row: EventRow = {
+        id: event.id,
+        event_type: event.event_type,
+        severity: event.severity,
+        hostname: event.hostname ?? '',
+        agent_id: event.agent_id ?? '',
+        detail: event.detail ?? {},
+        created_at: event.created_at,
+      };
+      return [row, ...prev].slice(0, pageSize);
+    });
+    setTotal((t) => t + 1);
+  });
 
   const columns = [
     { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 180 },

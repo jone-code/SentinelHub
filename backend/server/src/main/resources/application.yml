@@ -63,12 +63,19 @@ sentinelhub:
       enabled: ${AUDIT_CH_ENABLED:false}
       url: ${AUDIT_CH_URL:http://localhost:8123}
       database: ${AUDIT_CH_DATABASE:sentinelhub}
+    timeline:
+      fallback-to-hot: ${TIMELINE_FALLBACK_TO_HOT:true}
     nats:
       enabled: ${AUDIT_NATS_ENABLED:false}
       url: ${NATS_URL:nats://localhost:4222}
       subject: ${AUDIT_NATS_SUBJECT:sentinel.audit.events}
       stream: ${AUDIT_NATS_STREAM:SENTINEL_AUDIT}
       durable: ${AUDIT_NATS_DURABLE:audit-writer}
+      batch-size: ${AUDIT_NATS_BATCH_SIZE:50}
+      max-in-flight: ${AUDIT_NATS_MAX_IN_FLIGHT:2}
+      fetch-timeout-ms: ${AUDIT_NATS_FETCH_TIMEOUT_MS:2000}
+      backlog-backoff-ms: ${AUDIT_NATS_BACKLOG_BACKOFF_MS:500}
+      max-stream-bytes: ${AUDIT_NATS_MAX_STREAM_BYTES:0}
   client-events:
     nats:
       enabled: ${CLIENT_EVENTS_NATS_ENABLED:false}
@@ -76,3 +83,8 @@ sentinelhub:
       subject: ${CLIENT_EVENTS_NATS_SUBJECT:sentinel.client.events}
       stream: ${CLIENT_EVENTS_NATS_STREAM:SENTINEL_CLIENT_EVENTS}
       durable: ${CLIENT_EVENTS_NATS_DURABLE:client-events-writer}
+      batch-size: ${CLIENT_EVENTS_NATS_BATCH_SIZE:100}
+      max-in-flight: ${CLIENT_EVENTS_NATS_MAX_IN_FLIGHT:3}
+      fetch-timeout-ms: ${CLIENT_EVENTS_NATS_FETCH_TIMEOUT_MS:2000}
+      backlog-backoff-ms: ${CLIENT_EVENTS_NATS_BACKLOG_BACKOFF_MS:500}
+      max-stream-bytes: ${CLIENT_EVENTS_NATS_MAX_STREAM_BYTES:0}
