@@ -20,7 +20,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: sentinelhub-server
 
 sentinelhub:
   api:
@@ -63,6 +66,7 @@ sentinelhub:
       enabled: ${AUDIT_CH_ENABLED:false}
       url: ${AUDIT_CH_URL:http://localhost:8123}
       database: ${AUDIT_CH_DATABASE:sentinelhub}
+      replacing-merge: ${AUDIT_CH_REPLACING_MERGE:false}
     timeline:
       fallback-to-hot: ${TIMELINE_FALLBACK_TO_HOT:true}
     timeline-sync:
@@ -85,6 +89,9 @@ sentinelhub:
       dlq-subject: ${AUDIT_NATS_DLQ_SUBJECT:sentinel.audit.events.dlq}
   admin:
     ws:
+      limits:
+        max-connections-per-tenant: ${WS_MAX_CONNECTIONS_PER_TENANT:10}
+        max-events-per-second-per-tenant: ${WS_MAX_EVENTS_PER_SECOND:50}
       broadcast:
         enabled: ${WS_BROADCAST_NATS_ENABLED:false}
         url: ${NATS_URL:nats://localhost:4222}

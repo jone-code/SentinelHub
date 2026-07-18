@@ -3,6 +3,7 @@ package com.sentinelhub.module.audit;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentinelhub.config.AuditClickHouseProperties;
+import com.sentinelhub.config.ClickHouseTableNames;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
@@ -102,7 +103,7 @@ public class ClickHouseAuditRepository {
         StringBuilder sql = new StringBuilder(
                 "SELECT id, actor_type, actor_id, action, resource, resource_id, detail, ip_address, "
                         + "formatDateTime(created_at, '%Y-%m-%d %H:%i:%s') AS created_at "
-                        + "FROM " + properties.database() + ".audit_logs WHERE tenant_id = '"
+                        + "FROM " + ClickHouseTableNames.qualified(properties, "audit_logs") + " WHERE tenant_id = '"
                         + escapeSql(tenantId) + "'");
         if (actionFilter != null && !actionFilter.isBlank()) {
             sql.append(" AND action LIKE '%").append(escapeSql(actionFilter)).append("%'");
@@ -124,7 +125,7 @@ public class ClickHouseAuditRepository {
             return 0;
         }
         StringBuilder sql = new StringBuilder(
-                "SELECT count() AS c FROM " + properties.database() + ".audit_logs WHERE tenant_id = '"
+                "SELECT count() AS c FROM " + ClickHouseTableNames.qualified(properties, "audit_logs") + " WHERE tenant_id = '"
                         + escapeSql(tenantId) + "'");
         if (actionFilter != null && !actionFilter.isBlank()) {
             sql.append(" AND action LIKE '%").append(escapeSql(actionFilter)).append("%'");
@@ -151,13 +152,16 @@ public class ClickHouseAuditRepository {
         }
         try {
             postQuery("CREATE DATABASE IF NOT EXISTS " + properties.database(), "");
+            String engine = properties.replacingMerge()
+                    ? "ReplacingMergeTree(created_at) ORDER BY (tenant_id, id)"
+                    : "MergeTree() ORDER BY (tenant_id, created_at)";
             postQuery(
                     "CREATE TABLE IF NOT EXISTS " + properties.database() + ".audit_logs ("
                             + "id String, tenant_id String, actor_type String, actor_id String, "
                             + "action String, resource Nullable(String), resource_id Nullable(String), "
                             + "detail String, ip_address Nullable(String), "
                             + "created_at DateTime64(3) DEFAULT now64(3)"
-                            + ") ENGINE = MergeTree() ORDER BY (tenant_id, created_at)", "");
+                            + ") ENGINE = " + engine, "");
         } catch (Exception e) {
             log.warn("ClickHouse schema init failed: {}", e.getMessage());
         }
