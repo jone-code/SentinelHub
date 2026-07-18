@@ -1,5 +1,8 @@
 CREATE DATABASE IF NOT EXISTS sentinelhub;
 
+-- Set AUDIT_CH_REPLACING_MERGE=true for new installs to enable dedup tables.
+-- Existing MergeTree tables are not altered automatically.
+
 CREATE TABLE IF NOT EXISTS sentinelhub.audit_logs
 (
     id          String,
@@ -13,8 +16,8 @@ CREATE TABLE IF NOT EXISTS sentinelhub.audit_logs
     ip_address  Nullable(String),
     created_at  DateTime64(3) DEFAULT now64(3)
 )
-ENGINE = MergeTree()
-ORDER BY (tenant_id, created_at)
+ENGINE = ReplacingMergeTree(created_at)
+ORDER BY (tenant_id, id)
 TTL created_at + INTERVAL 365 DAY;
 
 CREATE TABLE IF NOT EXISTS sentinelhub.client_events
@@ -27,6 +30,6 @@ CREATE TABLE IF NOT EXISTS sentinelhub.client_events
     detail      String,
     created_at  DateTime64(3) DEFAULT now64(3)
 )
-ENGINE = MergeTree()
-ORDER BY (tenant_id, created_at)
+ENGINE = ReplacingMergeTree(created_at)
+ORDER BY (tenant_id, id)
 TTL created_at + INTERVAL 365 DAY;

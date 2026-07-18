@@ -29,7 +29,10 @@ public class AdminEventWebSocketHandler extends TextWebSocketHandler {
             session.close(CloseStatus.NOT_ACCEPTABLE);
             return;
         }
-        pushService.register(tenantId, session);
+        if (!pushService.tryRegister(tenantId, session)) {
+            session.close(new CloseStatus(4429, "tenant connection limit exceeded"));
+            return;
+        }
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(Map.of(
                 "type", "connected",
                 "filter", "driver.*"

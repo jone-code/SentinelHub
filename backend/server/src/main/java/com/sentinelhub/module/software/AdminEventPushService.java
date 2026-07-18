@@ -34,6 +34,10 @@ public class AdminEventPushService {
         this.sessionRegistry = sessionRegistry;
     }
 
+    public boolean tryRegister(String tenantId, org.springframework.web.socket.WebSocketSession session) {
+        return sessionRegistry.tryRegister(tenantId, session);
+    }
+
     public void register(String tenantId, org.springframework.web.socket.WebSocketSession session) {
         sessionRegistry.register(tenantId, session);
     }

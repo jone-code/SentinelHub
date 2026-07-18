@@ -138,8 +138,24 @@ docker compose up -d
 | `AUDIT_NATS_MAX_DELIVER` | 审计消息最大投递次数后进 DLQ |
 | `CLIENT_EVENTS_NATS_MAX_DELIVER` | 客户端事件最大投递次数后进 DLQ |
 
+## 平台增强（phase 10）
+
+| 组件 | 能力 |
+|------|------|
+| WebSocket | 租户级连接数上限 + 广播速率限流（HTTP 4429 拒绝超限连接） |
+| ClickHouse | `ReplacingMergeTree` 去重（`AUDIT_CH_REPLACING_MERGE` + `FINAL` 查询） |
+| 可观测性 | Micrometer → `/actuator/prometheus` + 管理台 `metrics-summary` |
+
+### 配置
+
+| 变量 | 说明 |
+|------|------|
+| `WS_MAX_CONNECTIONS_PER_TENANT` | 每租户 WebSocket 连接上限（默认 10） |
+| `WS_MAX_EVENTS_PER_SECOND` | 每租户广播速率上限（默认 50/s） |
+| `AUDIT_CH_REPLACING_MERGE` | ClickHouse 使用 ReplacingMergeTree 去重 |
+
 ## 后续增强
 
-1. WebSocket 连接数与租户级限流
-2. ClickHouse ReplacingMergeTree 去重同步
-3. NATS 指标接入 Prometheus/Grafana
+1. WebSocket 跨租户全局连接池配额
+2. ClickHouse 存量表在线迁移至 ReplacingMergeTree
+3. Grafana 仪表盘模板与告警规则

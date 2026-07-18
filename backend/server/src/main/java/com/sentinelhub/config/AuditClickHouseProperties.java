@@ -6,7 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record AuditClickHouseProperties(
         boolean enabled,
         String url,
-        String database
+        String database,
+        boolean replacingMerge
 ) {
     public AuditClickHouseProperties {
         if (url == null || url.isBlank()) {

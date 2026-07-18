@@ -3,6 +3,7 @@ package com.sentinelhub.module.audit;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentinelhub.config.AuditClickHouseProperties;
+import com.sentinelhub.config.ClickHouseTableNames;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
@@ -51,13 +52,13 @@ public class ClickHouseSecurityTimelineRepository {
                         + "formatDateTime(created_at, '%Y-%m-%d %H:%i:%s') AS created_at, "
                         + "action AS title, actor_type, actor_id, resource, "
                         + "NULL AS severity, detail "
-                        + "FROM " + properties.database() + ".audit_logs WHERE tenant_id = '" + tenant + "' "
+                        + "FROM " + ClickHouseTableNames.qualified(properties, "audit_logs") + " WHERE tenant_id = '" + tenant + "' "
                         + "UNION ALL "
                         + "SELECT id, 'client_event' AS source, "
                         + "formatDateTime(created_at, '%Y-%m-%d %H:%i:%s') AS created_at, "
                         + "event_type AS title, 'agent' AS actor_type, device_id AS actor_id, "
                         + "severity AS resource, severity, detail "
-                        + "FROM " + properties.database() + ".client_events WHERE tenant_id = '" + tenant + "'"
+                        + "FROM " + ClickHouseTableNames.qualified(properties, "client_events") + " WHERE tenant_id = '" + tenant + "'"
                         + ") timeline");
         if (sourceFilter != null && !sourceFilter.isBlank()) {
             sql.append(" WHERE source = '").append(escapeSql(sourceFilter)).append("'");
@@ -81,10 +82,10 @@ public class ClickHouseSecurityTimelineRepository {
         String tenant = escapeSql(tenantId);
         StringBuilder sql = new StringBuilder(
                 "SELECT count() AS c FROM ("
-                        + "SELECT 'audit' AS source FROM " + properties.database() + ".audit_logs WHERE tenant_id = '"
+                        + "SELECT 'audit' AS source FROM " + ClickHouseTableNames.qualified(properties, "audit_logs") + " WHERE tenant_id = '"
                         + tenant + "' "
                         + "UNION ALL "
-                        + "SELECT 'client_event' AS source FROM " + properties.database() + ".client_events WHERE tenant_id = '"
+                        + "SELECT 'client_event' AS source FROM " + ClickHouseTableNames.qualified(properties, "client_events") + " WHERE tenant_id = '"
                         + tenant + "'"
                         + ") timeline");
         if (sourceFilter != null && !sourceFilter.isBlank()) {

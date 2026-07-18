@@ -3,6 +3,7 @@ package com.sentinelhub.module.software;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentinelhub.config.AuditClickHouseProperties;
+import com.sentinelhub.config.ClickHouseTableNames;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
@@ -95,7 +96,7 @@ public class ClickHouseClientEventRepository {
         StringBuilder sql = new StringBuilder(
                 "SELECT id, device_id, event_type, severity, detail, "
                         + "formatDateTime(created_at, '%Y-%m-%d %H:%i:%s') AS created_at "
-                        + "FROM " + properties.database() + ".client_events WHERE tenant_id = '"
+                        + "FROM " + ClickHouseTableNames.qualified(properties, "client_events") + " WHERE tenant_id = '"
                         + escapeSql(tenantId) + "'");
         if (eventTypeFilter != null && !eventTypeFilter.isBlank()) {
             sql.append(" AND event_type LIKE '%").append(escapeSql(eventTypeFilter)).append("%'");
@@ -119,7 +120,7 @@ public class ClickHouseClientEventRepository {
             return 0;
         }
         StringBuilder sql = new StringBuilder(
-                "SELECT count() AS c FROM " + properties.database() + ".client_events WHERE tenant_id = '"
+                "SELECT count() AS c FROM " + ClickHouseTableNames.qualified(properties, "client_events") + " WHERE tenant_id = '"
                         + escapeSql(tenantId) + "'");
         if (eventTypeFilter != null && !eventTypeFilter.isBlank()) {
             sql.append(" AND event_type LIKE '%").append(escapeSql(eventTypeFilter)).append("%'");
@@ -148,13 +149,15 @@ public class ClickHouseClientEventRepository {
         }
         try {
             postQuery("CREATE DATABASE IF NOT EXISTS " + properties.database(), "");
+            String engine = properties.replacingMerge()
+                    ? "ReplacingMergeTree(created_at) ORDER BY (tenant_id, id)"
+                    : "MergeTree() ORDER BY (tenant_id, created_at)";
             postQuery(
                     "CREATE TABLE IF NOT EXISTS " + properties.database() + ".client_events ("
                             + "id String, tenant_id String, device_id String, "
                             + "event_type String, severity String, detail String, "
                             + "created_at DateTime64(3) DEFAULT now64(3)"
-                            + ") ENGINE = MergeTree() ORDER BY (tenant_id, created_at) "
-                            + "TTL created_at + INTERVAL 365 DAY", "");
+                            + ") ENGINE = " + engine + " TTL created_at + INTERVAL 365 DAY", "");
         } catch (Exception e) {
             log.warn("ClickHouse client_events schema init failed: {}", e.getMessage());
         }
