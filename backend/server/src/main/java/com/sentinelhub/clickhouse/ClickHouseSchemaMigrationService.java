@@ -14,6 +14,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,7 @@ public class ClickHouseSchemaMigrationService {
 
     private final AuditClickHouseProperties properties;
     private final ObjectMapper objectMapper;
+    private final ClickHouseMigrationStatus status = new ClickHouseMigrationStatus();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3))
             .build();
@@ -40,50 +42,102 @@ public class ClickHouseSchemaMigrationService {
         this.objectMapper = objectMapper;
     }
 
+    public Map<String, Object> snapshot() {
+        return status.snapshot();
+    }
+
     public void migrateToReplacingMergeTreeIfNeeded() {
         if (!properties.enabled() || !properties.replacingMergeMigrateOnStartup()) {
+            status.idle("migration not scheduled on startup");
+            return;
+        }
+        runMigration("startup");
+    }
+
+    public synchronized void runMigration(String trigger) {
+        if (!properties.enabled()) {
+            status.skip("ClickHouse disabled");
             return;
         }
         if (!properties.replacingMerge()) {
-            log.warn("ClickHouse replacing-merge-migrate-on-startup enabled but replacing-merge is false; skipping");
+            status.skip("replacing-merge is false");
             return;
         }
+        if (status.isRunning()) {
+            throw new IllegalStateException("migration already running");
+        }
+        status.reset("trigger=" + trigger);
         try {
             migrateTable(AUDIT_LOGS);
             migrateTable(CLIENT_EVENTS);
+            status.complete("migration finished");
         } catch (Exception e) {
+            status.fail(e.getMessage());
             throw new IllegalStateException("ClickHouse ReplacingMergeTree migration failed", e);
         }
     }
 
     private void migrateTable(String table) throws Exception {
+        Instant started = Instant.now();
         String engine = readEngine(table);
         if (engine == null) {
             log.info("ClickHouse table {} does not exist; skipping migration", table);
+            status.addTable(new ClickHouseMigrationStatus.TableMigration(
+                    table, null, ClickHouseMigrationStatus.TableStatus.SKIPPED,
+                    "check", "table does not exist", started, Instant.now()));
             return;
         }
         if (engine.contains("ReplacingMergeTree")) {
             log.info("ClickHouse table {} already ReplacingMergeTree", table);
+            status.addTable(new ClickHouseMigrationStatus.TableMigration(
+                    table, engine, ClickHouseMigrationStatus.TableStatus.SKIPPED,
+                    "check", "already ReplacingMergeTree", started, Instant.now()));
             return;
         }
         if (!engine.contains("MergeTree")) {
             log.warn("ClickHouse table {} has unexpected engine {}; skipping migration", table, engine);
+            status.addTable(new ClickHouseMigrationStatus.TableMigration(
+                    table, engine, ClickHouseMigrationStatus.TableStatus.SKIPPED,
+                    "check", "unexpected engine: " + engine, started, Instant.now()));
             return;
         }
+
+        status.addTable(new ClickHouseMigrationStatus.TableMigration(
+                table, engine, ClickHouseMigrationStatus.TableStatus.RUNNING,
+                "prepare", "starting migration", started, null));
 
         String db = properties.database();
         String newTable = table + "_new";
         String oldTable = table + "_old";
         log.info("Migrating ClickHouse {} from {} to ReplacingMergeTree", table, engine);
 
+        updateStep(table, engine, "drop_staging", "dropping staging tables", started);
         postQuery("DROP TABLE IF EXISTS " + db + "." + newTable, "");
         postQuery("DROP TABLE IF EXISTS " + db + "." + oldTable, "");
+
+        updateStep(table, engine, "create_new", "creating ReplacingMergeTree table", started);
         postQuery(createReplacingTableSql(db, newTable, table), "");
+
+        updateStep(table, engine, "copy_data", "copying rows", started);
         postQuery("INSERT INTO " + db + "." + newTable + " SELECT * FROM " + db + "." + table, "");
+
+        updateStep(table, engine, "rename", "swapping tables", started);
         postQuery("RENAME TABLE " + db + "." + table + " TO " + db + "." + oldTable
                 + ", " + db + "." + newTable + " TO " + db + "." + table, "");
+
+        updateStep(table, engine, "drop_old", "dropping old table", started);
         postQuery("DROP TABLE IF EXISTS " + db + "." + oldTable, "");
+
+        status.updateTable(table, new ClickHouseMigrationStatus.TableMigration(
+                table, engine, ClickHouseMigrationStatus.TableStatus.DONE,
+                "done", "migrated to ReplacingMergeTree", started, Instant.now()));
         log.info("ClickHouse table {} migrated to ReplacingMergeTree", table);
+    }
+
+    private void updateStep(String table, String engine, String step, String message, Instant started) {
+        status.updateTable(table, new ClickHouseMigrationStatus.TableMigration(
+                table, engine, ClickHouseMigrationStatus.TableStatus.RUNNING,
+                step, message, started, null));
     }
 
     private String createReplacingTableSql(String db, String newTable, String sourceTable) {

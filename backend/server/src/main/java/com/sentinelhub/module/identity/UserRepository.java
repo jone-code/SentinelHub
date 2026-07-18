@@ -74,9 +74,13 @@ public class UserRepository {
     public String insertTenant(String name, String slug, String registrationToken) {
         String id = UUID.randomUUID().toString();
         jdbc.update(
-                "INSERT INTO tenants (id, name, slug, registration_token) VALUES (?,?,?,?)",
-                id, name, slug, registrationToken);
+                "INSERT INTO tenants (id, name, slug, registration_token, plan_tier) VALUES (?,?,?,?,?)",
+                id, name, slug, registrationToken, "starter");
         return id;
+    }
+
+    public void updatePlanTier(String tenantId, String planTier) {
+        jdbc.update("UPDATE tenants SET plan_tier = ? WHERE id = ?", planTier, tenantId);
     }
 
     public String insertOrgUnit(String tenantId, String name, String path) {

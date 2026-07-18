@@ -41,6 +41,7 @@ public class DataInitializer implements ApplicationRunner {
 
         String tenantId = userRepository.insertTenant(
                 "Demo Tenant", seedProperties.tenantSlug(), seedProperties.registrationToken());
+        userRepository.updatePlanTier(tenantId, "business");
         String orgId = userRepository.insertOrgUnit(tenantId, "Root", "/" + tenantId + "/");
 
         String userId = UUID.randomUUID().toString();

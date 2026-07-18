@@ -8,6 +8,42 @@ services:
       - ./alerts:/etc/prometheus/alerts:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - alertmanager
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    ports:
+      - "9093:9093"
+    environment:
+      PAGERDUTY_ROUTING_KEY: ${PAGERDUTY_ROUTING_KEY:-}
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        sed "s|__PAGERDUTY_ROUTING_KEY__|$$PAGERDUTY_ROUTING_KEY|g" /etc/alertmanager/alertmanager.yml > /tmp/alertmanager.yml
+        exec /bin/alertmanager --config.file=/tmp/alertmanager.yml
+
+  prometheus-webhook-dingtalk:
+    image: timonwong/prometheus-webhook-dingtalk:v2.1.0
+    ports:
+      - "8060:8060"
+    environment:
+      DINGTALK_WEBHOOK_URL: ${DINGTALK_WEBHOOK_URL:-https://oapi.dingtalk.com/robot/send?access_token=placeholder}
+      DINGTALK_SECRET: ${DINGTALK_SECRET:-}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        cat > /tmp/dingtalk-config.yml <<EOF
+        targets:
+          webhook1:
+            url: $$DINGTALK_WEBHOOK_URL
+            secret: $$DINGTALK_SECRET
+        EOF
+        exec /bin/prometheus-webhook-dingtalk --config.file=/tmp/dingtalk-config.yml
 
   grafana:
     image: grafana/grafana:11.2.0
