@@ -54,3 +54,12 @@ groups:
         annotations:
           summary: "Client event messages sent to DLQ"
           description: "Client events were dead-lettered in the last 5 minutes."
+
+      - alert: WebSocketConnectionsHigh
+        expr: sentinel_websocket_connections_total > 80
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "WebSocket connections approaching global pool"
+          description: "Active admin WebSocket connections exceeded 80 for 10 minutes."

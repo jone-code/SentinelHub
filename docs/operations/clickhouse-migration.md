@@ -16,9 +16,15 @@ SentinelHub 审计与客户端事件冷存储使用 ClickHouse。Phase 10 起新
 
 1. **检查引擎** — 查询 `system.tables`，已是 `ReplacingMergeTree` 则跳过
 2. **创建 staging** — `audit_logs_new` / `client_events_new`
-3. **复制数据** — `INSERT INTO ..._new SELECT * FROM ...`
-4. **原子切换** — `RENAME TABLE` 交换新旧表
-5. **清理** — `DROP` 旧表
+3. **分批复制** — `INSERT INTO ..._new SELECT * FROM ... LIMIT batch OFFSET offset`（默认 batch=10000）
+4. **断点续传** — 进度写入 MySQL `clickhouse_migration_checkpoints`，失败后可从 offset 继续
+5. **原子切换** — `RENAME TABLE` 交换新旧表
+6. **清理** — `DROP` 旧表与 checkpoint
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `AUDIT_CH_MIGRATION_BATCH_SIZE` | 10000 | 每批复制行数 |
+| `AUDIT_CH_MIGRATION_RESUME` | true | 启用断点续传 |
 
 迁移期间表短暂不可用（RENAME 瞬间）。建议在低峰期执行。
 

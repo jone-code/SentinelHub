@@ -29,4 +29,8 @@ public class TenantPlanRepository {
                 tenantId);
         return tiers.stream().findFirst();
     }
+
+    public void updatePlanTier(String tenantId, String planTier) {
+        jdbc.update("UPDATE tenants SET plan_tier = ? WHERE id = ?", planTier, tenantId);
+    }
 }

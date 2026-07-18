@@ -22,6 +22,8 @@ public class ClickHouseMigrationStatus {
             TableStatus status,
             String step,
             String message,
+            Long rowsCopied,
+            Long totalRows,
             Instant startedAt,
             Instant finishedAt
     ) {
@@ -96,6 +98,13 @@ public class ClickHouseMigrationStatus {
             row.put("status", table.status().name().toLowerCase());
             row.put("step", table.step());
             row.put("message", table.message());
+            row.put("rows_copied", table.rowsCopied());
+            row.put("total_rows", table.totalRows());
+            if (table.rowsCopied() != null && table.totalRows() != null && table.totalRows() > 0) {
+                row.put("progress_percent", Math.min(100, table.rowsCopied() * 100 / table.totalRows()));
+            } else {
+                row.put("progress_percent", null);
+            }
             row.put("started_at", table.startedAt() != null ? table.startedAt().toString() : null);
             row.put("finished_at", table.finishedAt() != null ? table.finishedAt().toString() : null);
             tableRows.add(row);

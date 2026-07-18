@@ -18,9 +18,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
- * 将存量 MergeTree 表在线迁移为 ReplacingMergeTree（CREATE _new → INSERT → RENAME → DROP）。
+ * 将存量 MergeTree 表在线迁移为 ReplacingMergeTree，支持分批复制与断点续传。
  */
 @Service
 public class ClickHouseSchemaMigrationService {
@@ -32,14 +33,18 @@ public class ClickHouseSchemaMigrationService {
 
     private final AuditClickHouseProperties properties;
     private final ObjectMapper objectMapper;
+    private final ClickHouseMigrationCheckpointRepository checkpointRepository;
     private final ClickHouseMigrationStatus status = new ClickHouseMigrationStatus();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3))
             .build();
 
-    public ClickHouseSchemaMigrationService(AuditClickHouseProperties properties, ObjectMapper objectMapper) {
+    public ClickHouseSchemaMigrationService(AuditClickHouseProperties properties,
+                                            ObjectMapper objectMapper,
+                                            ClickHouseMigrationCheckpointRepository checkpointRepository) {
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.checkpointRepository = checkpointRepository;
     }
 
     public Map<String, Object> snapshot() {
@@ -82,62 +87,108 @@ public class ClickHouseSchemaMigrationService {
         String engine = readEngine(table);
         if (engine == null) {
             log.info("ClickHouse table {} does not exist; skipping migration", table);
-            status.addTable(new ClickHouseMigrationStatus.TableMigration(
-                    table, null, ClickHouseMigrationStatus.TableStatus.SKIPPED,
-                    "check", "table does not exist", started, Instant.now()));
+            checkpointRepository.delete(table);
+            status.addTable(skipped(table, null, "table does not exist", started));
             return;
         }
         if (engine.contains("ReplacingMergeTree")) {
             log.info("ClickHouse table {} already ReplacingMergeTree", table);
-            status.addTable(new ClickHouseMigrationStatus.TableMigration(
-                    table, engine, ClickHouseMigrationStatus.TableStatus.SKIPPED,
-                    "check", "already ReplacingMergeTree", started, Instant.now()));
+            checkpointRepository.delete(table);
+            status.addTable(skipped(table, engine, "already ReplacingMergeTree", started));
             return;
         }
         if (!engine.contains("MergeTree")) {
             log.warn("ClickHouse table {} has unexpected engine {}; skipping migration", table, engine);
-            status.addTable(new ClickHouseMigrationStatus.TableMigration(
-                    table, engine, ClickHouseMigrationStatus.TableStatus.SKIPPED,
-                    "check", "unexpected engine: " + engine, started, Instant.now()));
+            status.addTable(skipped(table, engine, "unexpected engine: " + engine, started));
             return;
         }
-
-        status.addTable(new ClickHouseMigrationStatus.TableMigration(
-                table, engine, ClickHouseMigrationStatus.TableStatus.RUNNING,
-                "prepare", "starting migration", started, null));
 
         String db = properties.database();
         String newTable = table + "_new";
         String oldTable = table + "_old";
-        log.info("Migrating ClickHouse {} from {} to ReplacingMergeTree", table, engine);
 
-        updateStep(table, engine, "drop_staging", "dropping staging tables", started);
-        postQuery("DROP TABLE IF EXISTS " + db + "." + newTable, "");
-        postQuery("DROP TABLE IF EXISTS " + db + "." + oldTable, "");
+        Optional<ClickHouseMigrationCheckpointRepository.Checkpoint> checkpoint =
+                properties.migrationResumeEnabled() ? checkpointRepository.find(table) : Optional.empty();
+        boolean resumeCopy = checkpoint.isPresent() && "copy_data".equals(checkpoint.get().step())
+                && tableExists(newTable);
 
-        updateStep(table, engine, "create_new", "creating ReplacingMergeTree table", started);
-        postQuery(createReplacingTableSql(db, newTable, table), "");
+        if (!resumeCopy) {
+            updateProgress(table, engine, ClickHouseMigrationStatus.TableStatus.RUNNING,
+                    "prepare", "starting migration", 0L, null, started);
+            log.info("Migrating ClickHouse {} from {} to ReplacingMergeTree", table, engine);
 
-        updateStep(table, engine, "copy_data", "copying rows", started);
-        postQuery("INSERT INTO " + db + "." + newTable + " SELECT * FROM " + db + "." + table, "");
+            updateProgress(table, engine, ClickHouseMigrationStatus.TableStatus.RUNNING,
+                    "drop_staging", "dropping staging tables", 0L, null, started);
+            postQuery("DROP TABLE IF EXISTS " + db + "." + newTable, "");
+            postQuery("DROP TABLE IF EXISTS " + db + "." + oldTable, "");
+            checkpointRepository.delete(table);
 
-        updateStep(table, engine, "rename", "swapping tables", started);
+            updateProgress(table, engine, ClickHouseMigrationStatus.TableStatus.RUNNING,
+                    "create_new", "creating ReplacingMergeTree table", 0L, null, started);
+            postQuery(createReplacingTableSql(db, newTable, table), "");
+        } else {
+            log.info("Resuming ClickHouse {} migration from offset {}", table, checkpoint.get().rowsCopied());
+            updateProgress(table, engine, ClickHouseMigrationStatus.TableStatus.RUNNING,
+                    "copy_data", "resuming batch copy", checkpoint.get().rowsCopied(),
+                    checkpoint.get().totalRows(), started);
+        }
+
+        long totalRows = countRows(table);
+        long offset = resumeCopy ? checkpoint.get().rowsCopied() : 0L;
+        int batchSize = properties.migrationBatchSize();
+        checkpointRepository.upsert(table, offset, totalRows, "copy_data");
+
+        while (offset < totalRows) {
+            updateProgress(table, engine, ClickHouseMigrationStatus.TableStatus.RUNNING,
+                    "copy_data", "copying rows " + offset + "/" + totalRows, offset, totalRows, started);
+            String copySql = "INSERT INTO " + db + "." + newTable
+                    + " SELECT * FROM " + db + "." + table
+                    + " LIMIT " + batchSize + " OFFSET " + offset;
+            postQuery(copySql, "");
+            offset = Math.min(offset + batchSize, totalRows);
+            checkpointRepository.upsert(table, offset, totalRows, "copy_data");
+        }
+
+        updateProgress(table, engine, ClickHouseMigrationStatus.TableStatus.RUNNING,
+                "rename", "swapping tables", totalRows, totalRows, started);
         postQuery("RENAME TABLE " + db + "." + table + " TO " + db + "." + oldTable
                 + ", " + db + "." + newTable + " TO " + db + "." + table, "");
 
-        updateStep(table, engine, "drop_old", "dropping old table", started);
+        updateProgress(table, engine, ClickHouseMigrationStatus.TableStatus.RUNNING,
+                "drop_old", "dropping old table", totalRows, totalRows, started);
         postQuery("DROP TABLE IF EXISTS " + db + "." + oldTable, "");
 
+        checkpointRepository.delete(table);
         status.updateTable(table, new ClickHouseMigrationStatus.TableMigration(
                 table, engine, ClickHouseMigrationStatus.TableStatus.DONE,
-                "done", "migrated to ReplacingMergeTree", started, Instant.now()));
-        log.info("ClickHouse table {} migrated to ReplacingMergeTree", table);
+                "done", "migrated to ReplacingMergeTree", totalRows, totalRows, started, Instant.now()));
+        log.info("ClickHouse table {} migrated to ReplacingMergeTree ({} rows)", table, totalRows);
     }
 
-    private void updateStep(String table, String engine, String step, String message, Instant started) {
+    private ClickHouseMigrationStatus.TableMigration skipped(String table, String engine, String message, Instant started) {
+        return new ClickHouseMigrationStatus.TableMigration(
+                table, engine, ClickHouseMigrationStatus.TableStatus.SKIPPED,
+                "check", message, null, null, started, Instant.now());
+    }
+
+    private void updateProgress(String table, String engine, ClickHouseMigrationStatus.TableStatus tableStatus,
+                                String step, String message, Long rowsCopied, Long totalRows, Instant started) {
         status.updateTable(table, new ClickHouseMigrationStatus.TableMigration(
-                table, engine, ClickHouseMigrationStatus.TableStatus.RUNNING,
-                step, message, started, null));
+                table, engine, tableStatus, step, message, rowsCopied, totalRows, started, null));
+    }
+
+    private boolean tableExists(String table) throws Exception {
+        return readEngine(table) != null;
+    }
+
+    private long countRows(String table) throws Exception {
+        String sql = "SELECT count() AS c FROM " + properties.database() + "." + table + " FORMAT JSONEachRow";
+        List<Map<String, Object>> rows = parseJsonEachRow(postQuery(sql, ""));
+        if (rows.isEmpty()) {
+            return 0L;
+        }
+        Object c = rows.getFirst().get("c");
+        return c instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(c));
     }
 
     private String createReplacingTableSql(String db, String newTable, String sourceTable) {
@@ -174,7 +225,7 @@ public class ClickHouseSchemaMigrationService {
         String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(properties.url() + "/?query=" + encoded))
-                .timeout(Duration.ofSeconds(120))
+                .timeout(Duration.ofSeconds(300))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body == null ? "" : body))
                 .build();

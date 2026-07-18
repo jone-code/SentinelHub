@@ -16,6 +16,7 @@ import Zerotrust from './pages/zerotrust';
 import Mdm from './pages/mdm';
 import Remote from './pages/remote';
 import Ai from './pages/ai';
+import Platform from './pages/platform';
 import { getToken, clearToken } from './api/client';
 
 const { Header, Sider, Content } = Layout;
@@ -36,6 +37,7 @@ const menuItems = [
   { key: '/remote', label: <Link to="/remote">远程协助</Link> },
   { key: '/ai', label: <Link to="/ai">AI 分析</Link> },
   { key: '/audit', label: <Link to="/audit">审计日志</Link> },
+  { key: '/platform', label: <Link to="/platform">平台设置</Link> },
 ];
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -86,6 +88,7 @@ function AppLayout() {
             <Route path="/remote" element={<Remote />} />
             <Route path="/ai" element={<Ai />} />
             <Route path="/audit" element={<Audit />} />
+            <Route path="/platform" element={<Platform />} />
             <Route path="*" element={<Placeholder title="模块开发中" />} />
           </Routes>
         </Content>
