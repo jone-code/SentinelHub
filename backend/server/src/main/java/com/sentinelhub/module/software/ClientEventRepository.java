@@ -116,4 +116,11 @@ public class ClientEventRepository {
                 Integer.class, deviceId, hours);
         return c != null ? c : 0;
     }
+
+    public List<Map<String, Object>> listAfterWatermark(java.sql.Timestamp watermark, int limit) {
+        return jdbc.queryForList(
+                "SELECT id, tenant_id, device_id, event_type, severity, CAST(detail AS CHAR) AS detail, created_at "
+                        + "FROM client_events WHERE created_at > ? ORDER BY created_at ASC LIMIT ?",
+                watermark, limit);
+    }
 }

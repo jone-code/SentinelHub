@@ -91,4 +91,12 @@ public class AuditRepository {
         Integer c = jdbc.queryForObject(sql.toString(), Integer.class, args.toArray());
         return c != null ? c : 0;
     }
+
+    public List<Map<String, Object>> listAfterWatermark(java.sql.Timestamp watermark, int limit) {
+        return jdbc.queryForList(
+                "SELECT id, tenant_id, actor_type, actor_id, action, resource, resource_id, "
+                        + "CAST(detail AS CHAR) AS detail, ip_address, created_at "
+                        + "FROM audit_logs WHERE created_at > ? ORDER BY created_at ASC LIMIT ?",
+                watermark, limit);
+    }
 }

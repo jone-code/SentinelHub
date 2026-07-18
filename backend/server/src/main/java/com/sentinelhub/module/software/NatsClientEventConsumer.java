@@ -2,6 +2,8 @@ package com.sentinelhub.module.software;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentinelhub.config.ClientEventNatsProperties;
+import com.sentinelhub.module.audit.NatsConsumerMetrics;
+import com.sentinelhub.module.audit.NatsDlqSupport;
 import io.nats.client.Connection;
 import io.nats.client.JetStream;
 import io.nats.client.JetStreamManagement;
@@ -32,13 +34,16 @@ public class NatsClientEventConsumer implements ApplicationRunner {
     private final ClientEventNatsProperties properties;
     private final ObjectMapper objectMapper;
     private final SoftwareService softwareService;
+    private final NatsConsumerMetrics metrics;
 
     public NatsClientEventConsumer(ClientEventNatsProperties properties,
                                    ObjectMapper objectMapper,
-                                   SoftwareService softwareService) {
+                                   SoftwareService softwareService,
+                                   NatsConsumerMetrics metrics) {
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.softwareService = softwareService;
+        this.metrics = metrics;
     }
 
     @Override
@@ -62,6 +67,7 @@ public class NatsClientEventConsumer implements ApplicationRunner {
             Connection nc = Nats.connect(options);
             JetStreamManagement jsm = nc.jetStreamManagement();
             ensureStream(jsm);
+            NatsDlqSupport.ensureDlqStream(jsm, properties.dlqStream(), properties.dlqSubject());
 
             JetStream js = nc.jetStream();
             PullSubscribeOptions pullOpts = PullSubscribeOptions.builder()
@@ -71,6 +77,7 @@ public class NatsClientEventConsumer implements ApplicationRunner {
 
             while (!Thread.currentThread().isInterrupted()) {
                 if (shouldBackoff(jsm)) {
+                    metrics.recordClientEventBackoff();
                     Thread.sleep(properties.backlogBackoffMs());
                     continue;
                 }
@@ -80,7 +87,7 @@ public class NatsClientEventConsumer implements ApplicationRunner {
                 if (messages.isEmpty()) {
                     continue;
                 }
-                handleBatch(messages);
+                handleBatch(messages, js, jsm);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -117,24 +124,46 @@ public class NatsClientEventConsumer implements ApplicationRunner {
         }
     }
 
-    private void handleBatch(List<Message> messages) {
+    private void handleBatch(List<Message> messages, JetStream js, JetStreamManagement jsm) {
         List<ClientEventMessage> events = new ArrayList<>(messages.size());
-        try {
-            for (Message msg : messages) {
+        List<Message> parsed = new ArrayList<>(messages.size());
+        for (Message msg : messages) {
+            try {
                 String json = new String(msg.getData(), StandardCharsets.UTF_8);
                 events.add(objectMapper.readValue(json, ClientEventMessage.class));
+                parsed.add(msg);
+            } catch (Exception e) {
+                log.warn("NATS client_events message parse failed: {}", e.getMessage());
+                if (NatsDlqSupport.deliveredCount(msg) >= properties.maxDeliver()) {
+                    NatsDlqSupport.handleFailure(js, jsm, properties.dlqStream(), properties.dlqSubject(),
+                            properties.maxDeliver(), msg);
+                    metrics.recordClientEventDlq(1);
+                } else {
+                    try {
+                        msg.nak();
+                    } catch (Exception ignored) {
+                    }
+                }
             }
+        }
+        if (parsed.isEmpty()) {
+            return;
+        }
+        try {
             softwareService.writeSyncBatch(events);
-            for (Message msg : messages) {
+            metrics.recordClientEventBatchSuccess(events.size());
+            for (Message msg : parsed) {
                 msg.ack();
             }
         } catch (Exception e) {
             log.warn("NATS client_events batch handling failed: {}", e.getMessage());
-            for (Message msg : messages) {
-                try {
-                    msg.nak();
-                } catch (Exception ignored) {
+            metrics.recordClientEventBatchFailure(parsed.size());
+            for (Message msg : parsed) {
+                if (NatsDlqSupport.deliveredCount(msg) >= properties.maxDeliver()) {
+                    metrics.recordClientEventDlq(1);
                 }
+                NatsDlqSupport.handleFailure(js, jsm, properties.dlqStream(), properties.dlqSubject(),
+                        properties.maxDeliver(), msg);
             }
         }
     }

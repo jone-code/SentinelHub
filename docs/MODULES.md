@@ -121,8 +121,25 @@ docker compose up -d
 | `CLIENT_EVENTS_NATS_BATCH_SIZE` | 客户端事件 NATS 批量拉取大小 |
 | `*_NATS_MAX_STREAM_BYTES` | Stream 字节上限触发消费退避（0=禁用） |
 
+## 平台增强（phase 9）
+
+| 组件 | 能力 |
+|------|------|
+| WebSocket | NATS pub-sub 多实例广播（`WS_BROADCAST_NATS_ENABLED`） |
+| 时间线 | MySQL → ClickHouse 增量同步（`TIMELINE_SYNC_ENABLED`） |
+| NATS | 死信队列 + 消费指标 API（`GET /platform/nats-metrics`） |
+
+### 配置
+
+| 变量 | 说明 |
+|------|------|
+| `WS_BROADCAST_NATS_ENABLED` | 多实例 WebSocket 广播 |
+| `TIMELINE_SYNC_ENABLED` | 热存储增量同步至 ClickHouse |
+| `AUDIT_NATS_MAX_DELIVER` | 审计消息最大投递次数后进 DLQ |
+| `CLIENT_EVENTS_NATS_MAX_DELIVER` | 客户端事件最大投递次数后进 DLQ |
+
 ## 后续增强
 
-1. 多实例 WebSocket 广播（Redis/NATS pub-sub）
-2. 时间线热存储增量同步至 ClickHouse
-3. NATS 死信队列与消费监控指标
+1. WebSocket 连接数与租户级限流
+2. ClickHouse ReplacingMergeTree 去重同步
+3. NATS 指标接入 Prometheus/Grafana

@@ -13,7 +13,10 @@ public record ClientEventNatsProperties(
         int maxInFlight,
         int fetchTimeoutMs,
         int backlogBackoffMs,
-        long maxStreamBytes
+        long maxStreamBytes,
+        int maxDeliver,
+        String dlqStream,
+        String dlqSubject
 ) {
     public ClientEventNatsProperties {
         if (url == null || url.isBlank()) {
@@ -39,6 +42,15 @@ public record ClientEventNatsProperties(
         }
         if (backlogBackoffMs <= 0) {
             backlogBackoffMs = 500;
+        }
+        if (maxDeliver <= 0) {
+            maxDeliver = 5;
+        }
+        if (dlqStream == null || dlqStream.isBlank()) {
+            dlqStream = "SENTINEL_CLIENT_EVENTS_DLQ";
+        }
+        if (dlqSubject == null || dlqSubject.isBlank()) {
+            dlqSubject = "sentinel.client.events.dlq";
         }
     }
 }
