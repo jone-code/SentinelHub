@@ -15,6 +15,9 @@ route:
     - matchers:
         - severity = warning
       receiver: dingtalk
+    - matchers:
+        - severity = info
+      receiver: feishu
 
 receivers:
   - name: default
@@ -30,4 +33,9 @@ receivers:
   - name: dingtalk
     webhook_configs:
       - url: 'http://prometheus-webhook-dingtalk:8060/dingtalk/webhook1/send'
+        send_resolved: true
+
+  - name: feishu
+    webhook_configs:
+      - url: 'http://prometheus-webhook-feishu:8080/webhook'
         send_resolved: true

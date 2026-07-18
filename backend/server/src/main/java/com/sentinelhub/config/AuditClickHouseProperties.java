@@ -8,7 +8,9 @@ public record AuditClickHouseProperties(
         String url,
         String database,
         boolean replacingMerge,
-        boolean replacingMergeMigrateOnStartup
+        boolean replacingMergeMigrateOnStartup,
+        int migrationBatchSize,
+        boolean migrationResumeEnabled
 ) {
     public AuditClickHouseProperties {
         if (url == null || url.isBlank()) {
@@ -16,6 +18,9 @@ public record AuditClickHouseProperties(
         }
         if (database == null || database.isBlank()) {
             database = "sentinelhub";
+        }
+        if (migrationBatchSize <= 0) {
+            migrationBatchSize = 10000;
         }
     }
 }

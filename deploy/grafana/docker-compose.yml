@@ -45,6 +45,13 @@ services:
         EOF
         exec /bin/prometheus-webhook-dingtalk --config.file=/tmp/dingtalk-config.yml
 
+  prometheus-webhook-feishu:
+    image: zxh326/prometheus-webhook-feishu:v1.7.0
+    ports:
+      - "8070:8080"
+    environment:
+      FEISHU_WEBHOOK: ${FEISHU_WEBHOOK_URL:-https://open.feishu.cn/open-apis/bot/v2/hook/placeholder}
+
   grafana:
     image: grafana/grafana:11.2.0
     ports:

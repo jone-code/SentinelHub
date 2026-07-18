@@ -68,6 +68,8 @@ sentinelhub:
       database: ${AUDIT_CH_DATABASE:sentinelhub}
       replacing-merge: ${AUDIT_CH_REPLACING_MERGE:false}
       replacing-merge-migrate-on-startup: ${AUDIT_CH_REPLACING_MERGE_MIGRATE:false}
+      migration-batch-size: ${AUDIT_CH_MIGRATION_BATCH_SIZE:10000}
+      migration-resume-enabled: ${AUDIT_CH_MIGRATION_RESUME:true}
     timeline:
       fallback-to-hot: ${TIMELINE_FALLBACK_TO_HOT:true}
     timeline-sync:

@@ -26,6 +26,9 @@ cd deploy/grafana && docker compose --env-file .env up -d
 |----------|--------|
 | `critical` | PagerDuty（`PAGERDUTY_ROUTING_KEY`） |
 | `warning` | 钉钉（经 `prometheus-webhook-dingtalk` 转发） |
+| `info` | 飞书（经 `prometheus-webhook-feishu` 转发） |
+
+Grafana OnCall 集成见 `docs/operations/grafana-oncall.md`。
 
 ## 内容
 

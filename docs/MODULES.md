@@ -195,8 +195,30 @@ docker compose up -d
 | `GET /api/admin/v1/platform/clickhouse-migration` | ClickHouse 迁移状态 |
 | `POST /api/admin/v1/platform/clickhouse-migration/run` | 手动触发迁移 |
 
+## 平台增强（phase 13）
+
+| 组件 | 能力 |
+|------|------|
+| 管理台 | 平台设置页：套餐升降级 + ClickHouse 迁移进度 |
+| ClickHouse | 分批复制 + MySQL 断点续传（`clickhouse_migration_checkpoints`） |
+| Grafana | 飞书告警通道（info）+ OnCall 集成指南 |
+
+### 配置
+
+| 变量 | 说明 |
+|------|------|
+| `AUDIT_CH_MIGRATION_BATCH_SIZE` | 迁移每批行数（默认 10000） |
+| `AUDIT_CH_MIGRATION_RESUME` | 启用断点续传（默认 true） |
+| `FEISHU_WEBHOOK_URL` | 飞书机器人 Webhook（info 告警） |
+
+### API
+
+| 路径 | 说明 |
+|------|------|
+| `PUT /api/admin/v1/platform/plan-tier` | 升降级当前租户套餐 |
+
 ## 后续增强
 
-1. 管理台租户套餐升降级 UI
-2. ClickHouse 迁移分批复制与断点续传
-3. Grafana OnCall / 飞书告警通道
+1. 套餐变更审批流与账单集成
+2. ClickHouse 迁移后台异步任务（非阻塞 API）
+3. 管理台 NATS / WebSocket 实时监控面板
