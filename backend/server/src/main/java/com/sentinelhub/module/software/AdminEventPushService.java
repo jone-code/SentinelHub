@@ -5,16 +5,12 @@ import com.sentinelhub.module.device.DeviceRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketSession;
 
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AdminEventPushService {
@@ -25,34 +21,30 @@ public class AdminEventPushService {
 
     private final ObjectMapper objectMapper;
     private final DeviceRepository deviceRepository;
-    private final Map<String, Set<WebSocketSession>> tenantSessions = new ConcurrentHashMap<>();
+    private final NatsAdminEventBroadcastBridge broadcastBridge;
+    private final AdminWebSocketSessionRegistry sessionRegistry;
 
-    public AdminEventPushService(ObjectMapper objectMapper, DeviceRepository deviceRepository) {
+    public AdminEventPushService(ObjectMapper objectMapper,
+                                 DeviceRepository deviceRepository,
+                                 NatsAdminEventBroadcastBridge broadcastBridge,
+                                 AdminWebSocketSessionRegistry sessionRegistry) {
         this.objectMapper = objectMapper;
         this.deviceRepository = deviceRepository;
+        this.broadcastBridge = broadcastBridge;
+        this.sessionRegistry = sessionRegistry;
     }
 
-    public void register(String tenantId, WebSocketSession session) {
-        tenantSessions.computeIfAbsent(tenantId, k -> ConcurrentHashMap.newKeySet()).add(session);
+    public void register(String tenantId, org.springframework.web.socket.WebSocketSession session) {
+        sessionRegistry.register(tenantId, session);
     }
 
-    public void unregister(String tenantId, WebSocketSession session) {
-        Set<WebSocketSession> sessions = tenantSessions.get(tenantId);
-        if (sessions != null) {
-            sessions.remove(session);
-            if (sessions.isEmpty()) {
-                tenantSessions.remove(tenantId);
-            }
-        }
+    public void unregister(String tenantId, org.springframework.web.socket.WebSocketSession session) {
+        sessionRegistry.unregister(tenantId, session);
     }
 
     public void pushDriverEvent(String tenantId, String eventId, String deviceId, String clientId,
                                 String eventType, String severity, Map<String, Object> detail) {
         if (eventType == null || !eventType.startsWith("driver.")) {
-            return;
-        }
-        Set<WebSocketSession> sessions = tenantSessions.get(tenantId);
-        if (sessions == null || sessions.isEmpty()) {
             return;
         }
 
@@ -76,18 +68,14 @@ public class AdminEventPushService {
         data.put("created_at", TS_FMT.format(Instant.now()));
         payload.put("data", data);
 
-        try {
-            String json = objectMapper.writeValueAsString(payload);
-            TextMessage message = new TextMessage(json);
-            for (WebSocketSession session : sessions) {
-                if (session.isOpen()) {
-                    synchronized (session) {
-                        session.sendMessage(message);
-                    }
-                }
+        if (broadcastBridge.isEnabled()) {
+            broadcastBridge.publish(tenantId, payload);
+        } else {
+            try {
+                sessionRegistry.broadcast(tenantId, objectMapper.writeValueAsString(payload));
+            } catch (Exception e) {
+                log.warn("WebSocket driver event push failed: {}", e.getMessage());
             }
-        } catch (Exception e) {
-            log.warn("WebSocket driver event push failed: {}", e.getMessage());
         }
     }
 }

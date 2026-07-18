@@ -33,13 +33,16 @@ public class NatsAuditConsumer implements ApplicationRunner {
     private final AuditNatsProperties properties;
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
+    private final NatsConsumerMetrics metrics;
 
     public NatsAuditConsumer(AuditNatsProperties properties,
                              ObjectMapper objectMapper,
-                             AuditService auditService) {
+                             AuditService auditService,
+                             NatsConsumerMetrics metrics) {
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
+        this.metrics = metrics;
     }
 
     @Override
@@ -63,6 +66,7 @@ public class NatsAuditConsumer implements ApplicationRunner {
             Connection nc = Nats.connect(options);
             JetStreamManagement jsm = nc.jetStreamManagement();
             ensureStream(jsm);
+            NatsDlqSupport.ensureDlqStream(jsm, properties.dlqStream(), properties.dlqSubject());
 
             JetStream js = nc.jetStream();
             PullSubscribeOptions pullOpts = PullSubscribeOptions.builder()
@@ -72,6 +76,7 @@ public class NatsAuditConsumer implements ApplicationRunner {
 
             while (!Thread.currentThread().isInterrupted()) {
                 if (shouldBackoff(jsm)) {
+                    metrics.recordAuditBackoff();
                     Thread.sleep(properties.backlogBackoffMs());
                     continue;
                 }
@@ -81,7 +86,7 @@ public class NatsAuditConsumer implements ApplicationRunner {
                 if (messages.isEmpty()) {
                     continue;
                 }
-                handleBatch(messages);
+                handleBatch(messages, js, jsm);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -118,10 +123,11 @@ public class NatsAuditConsumer implements ApplicationRunner {
         }
     }
 
-    private void handleBatch(List<Message> messages) {
+    private void handleBatch(List<Message> messages, JetStream js, JetStreamManagement jsm) {
         List<AuditRepository.AuditRow> rows = new ArrayList<>(messages.size());
-        try {
-            for (Message msg : messages) {
+        List<Message> parsed = new ArrayList<>(messages.size());
+        for (Message msg : messages) {
+            try {
                 String json = new String(msg.getData(), StandardCharsets.UTF_8);
                 AuditEventMessage event = objectMapper.readValue(json, AuditEventMessage.class);
                 String id = event.id() != null ? event.id() : UUID.randomUUID().toString();
@@ -135,18 +141,39 @@ public class NatsAuditConsumer implements ApplicationRunner {
                         event.resourceId(),
                         event.detailJson(),
                         event.ip()));
+                parsed.add(msg);
+            } catch (Exception e) {
+                log.warn("NATS audit message parse failed: {}", e.getMessage());
+                if (NatsDlqSupport.deliveredCount(msg) >= properties.maxDeliver()) {
+                    NatsDlqSupport.handleFailure(js, jsm, properties.dlqStream(), properties.dlqSubject(),
+                            properties.maxDeliver(), msg);
+                    metrics.recordAuditDlq(1);
+                } else {
+                    try {
+                        msg.nak();
+                    } catch (Exception ignored) {
+                    }
+                }
             }
+        }
+        if (parsed.isEmpty()) {
+            return;
+        }
+        try {
             auditService.writeSyncBatch(rows);
-            for (Message msg : messages) {
+            metrics.recordAuditBatchSuccess(rows.size());
+            for (Message msg : parsed) {
                 msg.ack();
             }
         } catch (Exception e) {
             log.warn("NATS audit batch handling failed: {}", e.getMessage());
-            for (Message msg : messages) {
-                try {
-                    msg.nak();
-                } catch (Exception ignored) {
+            metrics.recordAuditBatchFailure(parsed.size());
+            for (Message msg : parsed) {
+                if (NatsDlqSupport.deliveredCount(msg) >= properties.maxDeliver()) {
+                    metrics.recordAuditDlq(1);
                 }
+                NatsDlqSupport.handleFailure(js, jsm, properties.dlqStream(), properties.dlqSubject(),
+                        properties.maxDeliver(), msg);
             }
         }
     }
