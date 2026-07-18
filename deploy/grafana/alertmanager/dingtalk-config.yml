@@ -1,0 +1,4 @@
+targets:
+  webhook1:
+    url: ${DINGTALK_WEBHOOK_URL}
+    secret: ${DINGTALK_SECRET:}

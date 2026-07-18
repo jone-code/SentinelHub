@@ -169,8 +169,34 @@ docker compose up -d
 | `WS_MAX_CONNECTIONS_GLOBAL` | 全局 WebSocket 连接上限（默认 100，0=不限） |
 | `AUDIT_CH_REPLACING_MERGE_MIGRATE` | 启动时将存量 MergeTree 在线迁移为 ReplacingMergeTree |
 
+## 平台增强（phase 12）
+
+| 组件 | 能力 |
+|------|------|
+| WebSocket | 按租户套餐分级配额（starter / business / enterprise） |
+| ClickHouse | 迁移进度 API + 运维手册（`docs/operations/clickhouse-migration.md`） |
+| Grafana | Alertmanager 路由至 PagerDuty（critical）与钉钉（warning） |
+
+### 配置
+
+| 变量 | 说明 |
+|------|------|
+| `WS_PLAN_QUOTAS_ENABLED` | 启用套餐分级配额（默认 true） |
+| `WS_PLAN_*_CONNECTIONS` | 各套餐连接上限 |
+| `WS_PLAN_*_EVENTS_PER_SECOND` | 各套餐广播速率上限 |
+| `PAGERDUTY_ROUTING_KEY` | Grafana 栈 critical 告警路由 |
+| `DINGTALK_WEBHOOK_URL` | Grafana 栈 warning 告警路由 |
+
+### API
+
+| 路径 | 说明 |
+|------|------|
+| `GET /api/admin/v1/platform/ws-plan-quota` | 当前租户套餐配额 |
+| `GET /api/admin/v1/platform/clickhouse-migration` | ClickHouse 迁移状态 |
+| `POST /api/admin/v1/platform/clickhouse-migration/run` | 手动触发迁移 |
+
 ## 后续增强
 
-1. WebSocket 连接数按租户套餐分级配额
-2. ClickHouse 迁移进度 API 与运维手册
-3. Grafana 告警对接 PagerDuty / 钉钉
+1. 管理台租户套餐升降级 UI
+2. ClickHouse 迁移分批复制与断点续传
+3. Grafana OnCall / 飞书告警通道

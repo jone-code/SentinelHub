@@ -22,6 +22,7 @@ public class AdminWebSocketSessionRegistry {
     private static final Logger log = LoggerFactory.getLogger(AdminWebSocketSessionRegistry.class);
 
     private final WebSocketLimitsProperties limits;
+    private final WebSocketPlanQuotaService planQuotaService;
     private final AdminWebSocketRateLimiter rateLimiter;
     private final Map<String, Set<WebSocketSession>> tenantSessions = new ConcurrentHashMap<>();
     private final AtomicInteger totalConnections = new AtomicInteger();
@@ -30,9 +31,11 @@ public class AdminWebSocketSessionRegistry {
     private volatile boolean lastRejectWasGlobal;
 
     public AdminWebSocketSessionRegistry(WebSocketLimitsProperties limits,
+                                         WebSocketPlanQuotaService planQuotaService,
                                          AdminWebSocketRateLimiter rateLimiter,
                                          MeterRegistry meterRegistry) {
         this.limits = limits;
+        this.planQuotaService = planQuotaService;
         this.rateLimiter = rateLimiter;
         Gauge.builder("sentinel.websocket.connections.total", totalConnections::get)
                 .description("Active admin WebSocket connections")
@@ -63,7 +66,7 @@ public class AdminWebSocketSessionRegistry {
                 return false;
             }
             Set<WebSocketSession> sessions = tenantSessions.computeIfAbsent(tenantId, k -> ConcurrentHashMap.newKeySet());
-            int max = limits.maxConnectionsPerTenant();
+            int max = planQuotaService.maxConnectionsForTenant(tenantId);
             if (max > 0 && sessions.size() >= max) {
                 return false;
             }
@@ -128,6 +131,10 @@ public class AdminWebSocketSessionRegistry {
         out.put("max_connections_per_tenant", limits.maxConnectionsPerTenant());
         out.put("max_connections_global", limits.maxConnectionsGlobal());
         out.put("max_events_per_second_per_tenant", limits.maxEventsPerSecondPerTenant());
+        out.put("plan_quotas_enabled", planQuotaService.isPlanQuotasEnabled());
+        Map<String, Object> perTenantQuota = new LinkedHashMap<>();
+        tenantSessions.keySet().forEach(tenantId -> perTenantQuota.put(tenantId, planQuotaService.quotaSnapshot(tenantId)));
+        out.put("per_tenant_quota", perTenantQuota);
         return out;
     }
 

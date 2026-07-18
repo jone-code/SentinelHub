@@ -1,0 +1,33 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = critical
+      receiver: pagerduty
+      continue: true
+    - matchers:
+        - severity = warning
+      receiver: dingtalk
+
+receivers:
+  - name: default
+    webhook_configs:
+      - url: 'http://127.0.0.1:1/'
+
+  - name: pagerduty
+    pagerduty_configs:
+      - routing_key: '__PAGERDUTY_ROUTING_KEY__'
+        severity: '{{ .CommonLabels.severity }}'
+        description: '{{ .CommonAnnotations.summary }} — {{ .CommonAnnotations.description }}'
+
+  - name: dingtalk
+    webhook_configs:
+      - url: 'http://prometheus-webhook-dingtalk:8060/dingtalk/webhook1/send'
+        send_resolved: true

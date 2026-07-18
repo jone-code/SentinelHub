@@ -94,6 +94,18 @@ sentinelhub:
         max-connections-per-tenant: ${WS_MAX_CONNECTIONS_PER_TENANT:10}
         max-connections-global: ${WS_MAX_CONNECTIONS_GLOBAL:100}
         max-events-per-second-per-tenant: ${WS_MAX_EVENTS_PER_SECOND:50}
+      plan-quotas:
+        enabled: ${WS_PLAN_QUOTAS_ENABLED:true}
+        tiers:
+          starter:
+            max-connections: ${WS_PLAN_STARTER_CONNECTIONS:5}
+            max-events-per-second: ${WS_PLAN_STARTER_EVENTS_PER_SECOND:20}
+          business:
+            max-connections: ${WS_PLAN_BUSINESS_CONNECTIONS:20}
+            max-events-per-second: ${WS_PLAN_BUSINESS_EVENTS_PER_SECOND:50}
+          enterprise:
+            max-connections: ${WS_PLAN_ENTERPRISE_CONNECTIONS:100}
+            max-events-per-second: ${WS_PLAN_ENTERPRISE_EVENTS_PER_SECOND:200}
       broadcast:
         enabled: ${WS_BROADCAST_NATS_ENABLED:false}
         url: ${NATS_URL:nats://localhost:4222}

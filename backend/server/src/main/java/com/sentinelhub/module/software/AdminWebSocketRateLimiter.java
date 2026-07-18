@@ -1,6 +1,5 @@
 package com.sentinelhub.module.software;
 
-import com.sentinelhub.config.WebSocketLimitsProperties;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -9,15 +8,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 public class AdminWebSocketRateLimiter {
 
-    private final WebSocketLimitsProperties limits;
+    private final WebSocketPlanQuotaService planQuotaService;
     private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
 
-    public AdminWebSocketRateLimiter(WebSocketLimitsProperties limits) {
-        this.limits = limits;
+    public AdminWebSocketRateLimiter(WebSocketPlanQuotaService planQuotaService) {
+        this.planQuotaService = planQuotaService;
     }
 
     public boolean allowBroadcast(String tenantId) {
-        int max = limits.maxEventsPerSecondPerTenant();
+        int max = planQuotaService.maxEventsPerSecondForTenant(tenantId);
         if (max <= 0) {
             return true;
         }
