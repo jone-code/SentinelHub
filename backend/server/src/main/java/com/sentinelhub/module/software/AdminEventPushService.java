@@ -38,6 +38,10 @@ public class AdminEventPushService {
         return sessionRegistry.tryRegister(tenantId, session);
     }
 
+    public boolean isGlobalLimitExceeded() {
+        return sessionRegistry.isGlobalLimitExceeded();
+    }
+
     public void register(String tenantId, org.springframework.web.socket.WebSocketSession session) {
         sessionRegistry.register(tenantId, session);
     }

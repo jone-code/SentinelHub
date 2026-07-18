@@ -5,7 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "sentinelhub.admin.ws.limits")
 public record WebSocketLimitsProperties(
         int maxConnectionsPerTenant,
-        int maxEventsPerSecondPerTenant
+        int maxEventsPerSecondPerTenant,
+        int maxConnectionsGlobal
 ) {
     public WebSocketLimitsProperties {
         if (maxConnectionsPerTenant <= 0) {
@@ -13,6 +14,9 @@ public record WebSocketLimitsProperties(
         }
         if (maxEventsPerSecondPerTenant <= 0) {
             maxEventsPerSecondPerTenant = 50;
+        }
+        if (maxConnectionsGlobal <= 0) {
+            maxConnectionsGlobal = 100;
         }
     }
 }
