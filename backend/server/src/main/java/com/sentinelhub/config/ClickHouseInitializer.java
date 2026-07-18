@@ -1,5 +1,6 @@
 package com.sentinelhub.config;
 
+import com.sentinelhub.clickhouse.ClickHouseSchemaMigrationService;
 import com.sentinelhub.module.audit.ClickHouseAuditRepository;
 import com.sentinelhub.module.software.ClickHouseClientEventRepository;
 import org.slf4j.Logger;
@@ -16,13 +17,16 @@ public class ClickHouseInitializer implements ApplicationRunner {
     private final AuditClickHouseProperties properties;
     private final ClickHouseAuditRepository clickHouseAuditRepository;
     private final ClickHouseClientEventRepository clickHouseClientEventRepository;
+    private final ClickHouseSchemaMigrationService migrationService;
 
     public ClickHouseInitializer(AuditClickHouseProperties properties,
                                  ClickHouseAuditRepository clickHouseAuditRepository,
-                                 ClickHouseClientEventRepository clickHouseClientEventRepository) {
+                                 ClickHouseClientEventRepository clickHouseClientEventRepository,
+                                 ClickHouseSchemaMigrationService migrationService) {
         this.properties = properties;
         this.clickHouseAuditRepository = clickHouseAuditRepository;
         this.clickHouseClientEventRepository = clickHouseClientEventRepository;
+        this.migrationService = migrationService;
     }
 
     @Override
@@ -32,6 +36,7 @@ public class ClickHouseInitializer implements ApplicationRunner {
         }
         clickHouseAuditRepository.ensureSchema();
         clickHouseClientEventRepository.ensureSchema();
+        migrationService.migrateToReplacingMergeTreeIfNeeded();
         log.info("ClickHouse cold storage enabled ({}) — audit_logs + client_events", properties.url());
     }
 }

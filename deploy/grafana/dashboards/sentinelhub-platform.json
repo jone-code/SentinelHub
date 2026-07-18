@@ -1,0 +1,126 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "sentinel_websocket_connections_total", "legendFormat": "connections", "refId": "A" }],
+      "title": "WebSocket Connections (total)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "sentinel_websocket_connections_tenants", "legendFormat": "tenants", "refId": "A" }],
+      "title": "WebSocket Tenants",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "rate(sentinel_websocket_connections_rejected_global_total[5m])", "legendFormat": "rejected/s", "refId": "A" }],
+      "title": "Global Pool Rejections",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "rate(sentinel_websocket_broadcasts_throttled_total[5m])", "legendFormat": "throttled/s", "refId": "A" }],
+      "title": "Broadcast Throttled",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "showPoints": "never" }, "unit": "ops" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "rate(sentinel_nats_audit_messages_processed_total[5m])", "legendFormat": "audit messages/s", "refId": "A" },
+        { "expr": "rate(sentinel_nats_client_events_messages_processed_total[5m])", "legendFormat": "client_events messages/s", "refId": "B" }
+      ],
+      "title": "NATS Messages Processed",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "showPoints": "never" }, "unit": "ops" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "rate(sentinel_nats_audit_batches_failed_total[5m])", "legendFormat": "audit batch failures/s", "refId": "A" },
+        { "expr": "rate(sentinel_nats_client_events_batches_failed_total[5m])", "legendFormat": "client_events batch failures/s", "refId": "B" },
+        { "expr": "rate(sentinel_nats_audit_messages_dlq_total[5m])", "legendFormat": "audit DLQ/s", "refId": "C" },
+        { "expr": "rate(sentinel_nats_client_events_messages_dlq_total[5m])", "legendFormat": "client_events DLQ/s", "refId": "D" }
+      ],
+      "title": "NATS Failures & DLQ",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "showPoints": "never" }, "unit": "ops" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "id": 7,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "rate(sentinel_nats_audit_backoff_count_total[5m])", "legendFormat": "audit backoff/s", "refId": "A" },
+        { "expr": "rate(sentinel_nats_client_events_backoff_count_total[5m])", "legendFormat": "client_events backoff/s", "refId": "B" },
+        { "expr": "rate(sentinel_nats_audit_batches_processed_total[5m])", "legendFormat": "audit batches/s", "refId": "C" },
+        { "expr": "rate(sentinel_nats_client_events_batches_processed_total[5m])", "legendFormat": "client_events batches/s", "refId": "D" }
+      ],
+      "title": "NATS Throughput & Backoff",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["sentinelhub", "platform"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SentinelHub Platform",
+  "uid": "sentinelhub-platform",
+  "version": 1
+}

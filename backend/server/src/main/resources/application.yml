@@ -67,6 +67,7 @@ sentinelhub:
       url: ${AUDIT_CH_URL:http://localhost:8123}
       database: ${AUDIT_CH_DATABASE:sentinelhub}
       replacing-merge: ${AUDIT_CH_REPLACING_MERGE:false}
+      replacing-merge-migrate-on-startup: ${AUDIT_CH_REPLACING_MERGE_MIGRATE:false}
     timeline:
       fallback-to-hot: ${TIMELINE_FALLBACK_TO_HOT:true}
     timeline-sync:
@@ -91,6 +92,7 @@ sentinelhub:
     ws:
       limits:
         max-connections-per-tenant: ${WS_MAX_CONNECTIONS_PER_TENANT:10}
+        max-connections-global: ${WS_MAX_CONNECTIONS_GLOBAL:100}
         max-events-per-second-per-tenant: ${WS_MAX_EVENTS_PER_SECOND:50}
       broadcast:
         enabled: ${WS_BROADCAST_NATS_ENABLED:false}

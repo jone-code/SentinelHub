@@ -1,0 +1,56 @@
+groups:
+  - name: sentinelhub-platform
+    rules:
+      - alert: WebSocketGlobalPoolExhausted
+        expr: increase(sentinel_websocket_connections_rejected_global_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket global connection pool rejections"
+          description: "Admin WebSocket connections were rejected due to global pool quota in the last 5 minutes."
+
+      - alert: WebSocketBroadcastThrottled
+        expr: increase(sentinel_websocket_broadcasts_throttled_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket broadcast rate limiting active"
+          description: "More than 10 WebSocket broadcasts were throttled in 5 minutes."
+
+      - alert: NatsAuditBatchFailures
+        expr: increase(sentinel_nats_audit_batches_failed_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "NATS audit consumer batch failures"
+          description: "Audit event batches failed to process in the last 5 minutes."
+
+      - alert: NatsClientEventsBatchFailures
+        expr: increase(sentinel_nats_client_events_batches_failed_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "NATS client_events consumer batch failures"
+          description: "Client event batches failed to process in the last 5 minutes."
+
+      - alert: NatsAuditDlqMessages
+        expr: increase(sentinel_nats_audit_messages_dlq_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Audit messages sent to DLQ"
+          description: "Audit events were dead-lettered in the last 5 minutes."
+
+      - alert: NatsClientEventsDlqMessages
+        expr: increase(sentinel_nats_client_events_messages_dlq_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Client event messages sent to DLQ"
+          description: "Client events were dead-lettered in the last 5 minutes."

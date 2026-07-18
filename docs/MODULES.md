@@ -154,8 +154,23 @@ docker compose up -d
 | `WS_MAX_EVENTS_PER_SECOND` | 每租户广播速率上限（默认 50/s） |
 | `AUDIT_CH_REPLACING_MERGE` | ClickHouse 使用 ReplacingMergeTree 去重 |
 
+## 平台增强（phase 11）
+
+| 组件 | 能力 |
+|------|------|
+| WebSocket | 跨租户全局连接池配额（默认 100，超限关闭码 4430） |
+| ClickHouse | 存量 MergeTree 表在线迁移至 ReplacingMergeTree（`AUDIT_CH_REPLACING_MERGE_MIGRATE`） |
+| Grafana | `deploy/grafana/` 仪表盘模板 + Prometheus 告警规则 |
+
+### 配置
+
+| 变量 | 说明 |
+|------|------|
+| `WS_MAX_CONNECTIONS_GLOBAL` | 全局 WebSocket 连接上限（默认 100，0=不限） |
+| `AUDIT_CH_REPLACING_MERGE_MIGRATE` | 启动时将存量 MergeTree 在线迁移为 ReplacingMergeTree |
+
 ## 后续增强
 
-1. WebSocket 跨租户全局连接池配额
-2. ClickHouse 存量表在线迁移至 ReplacingMergeTree
-3. Grafana 仪表盘模板与告警规则
+1. WebSocket 连接数按租户套餐分级配额
+2. ClickHouse 迁移进度 API 与运维手册
+3. Grafana 告警对接 PagerDuty / 钉钉

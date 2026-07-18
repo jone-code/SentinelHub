@@ -30,7 +30,9 @@ public class AdminEventWebSocketHandler extends TextWebSocketHandler {
             return;
         }
         if (!pushService.tryRegister(tenantId, session)) {
-            session.close(new CloseStatus(4429, "tenant connection limit exceeded"));
+            int code = pushService.isGlobalLimitExceeded() ? 4430 : 4429;
+            String reason = code == 4430 ? "global connection pool exhausted" : "tenant connection limit exceeded";
+            session.close(new CloseStatus(code, reason));
             return;
         }
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(Map.of(

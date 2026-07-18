@@ -7,7 +7,8 @@ public record AuditClickHouseProperties(
         boolean enabled,
         String url,
         String database,
-        boolean replacingMerge
+        boolean replacingMerge,
+        boolean replacingMergeMigrateOnStartup
 ) {
     public AuditClickHouseProperties {
         if (url == null || url.isBlank()) {
