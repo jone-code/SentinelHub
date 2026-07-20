@@ -217,8 +217,34 @@ docker compose up -d
 |------|------|
 | `PUT /api/admin/v1/platform/plan-tier` | 升降级当前租户套餐 |
 
+## 平台增强（phase 14）
+
+| 组件 | 能力 |
+|------|------|
+| 套餐 | 变更审批流 + 月费预估（`tenant_plan_change_requests`） |
+| ClickHouse | 迁移后台异步执行（非阻塞 API） |
+| 管理台 | `/platform/monitor` NATS + WebSocket 实时监控 |
+
+### 配置
+
+| 变量 | 说明 |
+|------|------|
+| `WS_PLAN_APPROVAL_ENABLED` | 启用套餐变更审批（默认 true） |
+| `WS_PLAN_AUTO_APPROVE_DOWNGRADE` | 降级自动批准（默认 true） |
+| `WS_PLAN_BILLING_ENABLED` | 启用月费预估 |
+| `WS_PLAN_PRICE_*_CENTS` | 各套餐月费（分） |
+
+### API
+
+| 路径 | 说明 |
+|------|------|
+| `POST /api/admin/v1/platform/plan-tier/requests` | 提交套餐变更申请 |
+| `GET /api/admin/v1/platform/plan-tier/requests` | 变更申请列表 |
+| `POST /api/admin/v1/platform/plan-tier/requests/{id}/approve` | 批准变更 |
+| `POST /api/admin/v1/platform/plan-tier/requests/{id}/reject` | 拒绝变更 |
+
 ## 后续增强
 
-1. 套餐变更审批流与账单集成
-2. ClickHouse 迁移后台异步任务（非阻塞 API）
-3. 管理台 NATS / WebSocket 实时监控面板
+1. 套餐变更多管理员审批与外部账单系统对接
+2. ClickHouse 迁移多实例协调锁
+3. 管理台 Prometheus 图表嵌入
