@@ -1,21 +1,27 @@
 package com.sentinelhub.api.admin;
 
+import com.sentinelhub.api.admin.dto.PlanChangeReviewRequest;
 import com.sentinelhub.api.admin.dto.UpdatePlanTierRequest;
+import com.sentinelhub.clickhouse.ClickHouseMigrationTaskService;
 import com.sentinelhub.clickhouse.ClickHouseSchemaMigrationService;
 import com.sentinelhub.common.dto.ApiResponse;
 import com.sentinelhub.common.tenant.TenantContext;
 import com.sentinelhub.module.audit.NatsConsumerMetrics;
 import com.sentinelhub.module.software.AdminWebSocketSessionRegistry;
 import com.sentinelhub.module.software.WebSocketPlanQuotaService;
+import com.sentinelhub.module.tenant.TenantPlanChangeService;
 import com.sentinelhub.module.tenant.TenantPlanService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -25,19 +31,25 @@ public class AdminPlatformController {
     private final NatsConsumerMetrics natsConsumerMetrics;
     private final AdminWebSocketSessionRegistry webSocketSessionRegistry;
     private final ClickHouseSchemaMigrationService clickHouseMigrationService;
+    private final ClickHouseMigrationTaskService clickHouseMigrationTaskService;
     private final WebSocketPlanQuotaService webSocketPlanQuotaService;
     private final TenantPlanService tenantPlanService;
+    private final TenantPlanChangeService tenantPlanChangeService;
 
     public AdminPlatformController(NatsConsumerMetrics natsConsumerMetrics,
                                    AdminWebSocketSessionRegistry webSocketSessionRegistry,
                                    ClickHouseSchemaMigrationService clickHouseMigrationService,
+                                   ClickHouseMigrationTaskService clickHouseMigrationTaskService,
                                    WebSocketPlanQuotaService webSocketPlanQuotaService,
-                                   TenantPlanService tenantPlanService) {
+                                   TenantPlanService tenantPlanService,
+                                   TenantPlanChangeService tenantPlanChangeService) {
         this.natsConsumerMetrics = natsConsumerMetrics;
         this.webSocketSessionRegistry = webSocketSessionRegistry;
         this.clickHouseMigrationService = clickHouseMigrationService;
+        this.clickHouseMigrationTaskService = clickHouseMigrationTaskService;
         this.webSocketPlanQuotaService = webSocketPlanQuotaService;
         this.tenantPlanService = tenantPlanService;
+        this.tenantPlanChangeService = tenantPlanChangeService;
     }
 
     @GetMapping("/nats-metrics")
@@ -72,8 +84,48 @@ public class AdminPlatformController {
     @PostMapping("/clickhouse-migration/run")
     public ApiResponse<Map<String, Object>> runClickHouseMigration() {
         requireTenant();
-        clickHouseMigrationService.runMigration("api");
-        return ApiResponse.ok(clickHouseMigrationService.snapshot());
+        return ApiResponse.ok(clickHouseMigrationTaskService.submit("api"));
+    }
+
+    @PostMapping("/plan-tier/requests")
+    public ApiResponse<Map<String, Object>> submitPlanChange(@RequestBody UpdatePlanTierRequest request) {
+        TenantContext ctx = requireTenant();
+        if (request == null || request.planTier() == null) {
+            throw new IllegalArgumentException("plan_tier is required");
+        }
+        Map<String, Object> result = tenantPlanChangeService.submitRequest(
+                ctx.tenantId(), ctx.userId(), request.planTier());
+        if ("applied".equals(result.get("status"))) {
+            result.putAll(webSocketPlanQuotaService.quotaSnapshot(ctx.tenantId()));
+        }
+        return ApiResponse.ok(result);
+    }
+
+    @GetMapping("/plan-tier/requests")
+    public ApiResponse<List<Map<String, Object>>> listPlanChangeRequests(
+            @RequestParam(required = false) String status) {
+        TenantContext ctx = requireTenant();
+        return ApiResponse.ok(tenantPlanChangeService.listRequests(ctx.tenantId(), status));
+    }
+
+    @PostMapping("/plan-tier/requests/{id}/approve")
+    public ApiResponse<Map<String, Object>> approvePlanChange(
+            @PathVariable String id,
+            @RequestBody(required = false) PlanChangeReviewRequest request) {
+        TenantContext ctx = requireTenant();
+        String note = request != null ? request.reviewNote() : null;
+        Map<String, Object> result = tenantPlanChangeService.approve(ctx.tenantId(), ctx.userId(), id, note);
+        result.putAll(webSocketPlanQuotaService.quotaSnapshot(ctx.tenantId()));
+        return ApiResponse.ok(result);
+    }
+
+    @PostMapping("/plan-tier/requests/{id}/reject")
+    public ApiResponse<Map<String, Object>> rejectPlanChange(
+            @PathVariable String id,
+            @RequestBody(required = false) PlanChangeReviewRequest request) {
+        TenantContext ctx = requireTenant();
+        String note = request != null ? request.reviewNote() : null;
+        return ApiResponse.ok(tenantPlanChangeService.reject(ctx.tenantId(), ctx.userId(), id, note));
     }
 
     @PutMapping("/plan-tier")
@@ -82,9 +134,12 @@ public class AdminPlatformController {
         if (request == null || request.planTier() == null) {
             throw new IllegalArgumentException("plan_tier is required");
         }
-        Map<String, Object> updated = tenantPlanService.updatePlanTier(ctx.tenantId(), request.planTier());
-        updated.putAll(webSocketPlanQuotaService.quotaSnapshot(ctx.tenantId()));
-        return ApiResponse.ok(updated);
+        Map<String, Object> result = tenantPlanChangeService.submitRequest(
+                ctx.tenantId(), ctx.userId(), request.planTier());
+        if ("applied".equals(result.get("status"))) {
+            result.putAll(webSocketPlanQuotaService.quotaSnapshot(ctx.tenantId()));
+        }
+        return ApiResponse.ok(result);
     }
 
     @GetMapping("/ws-plan-quota")

@@ -108,6 +108,16 @@ sentinelhub:
           enterprise:
             max-connections: ${WS_PLAN_ENTERPRISE_CONNECTIONS:100}
             max-events-per-second: ${WS_PLAN_ENTERPRISE_EVENTS_PER_SECOND:200}
+      plan-billing:
+        enabled: ${WS_PLAN_BILLING_ENABLED:true}
+        currency: ${WS_PLAN_BILLING_CURRENCY:CNY}
+        monthly-price-cents:
+          starter: ${WS_PLAN_PRICE_STARTER_CENTS:0}
+          business: ${WS_PLAN_PRICE_BUSINESS_CENTS:29900}
+          enterprise: ${WS_PLAN_PRICE_ENTERPRISE_CENTS:99900}
+      plan-approval:
+        enabled: ${WS_PLAN_APPROVAL_ENABLED:true}
+        auto-approve-downgrade: ${WS_PLAN_AUTO_APPROVE_DOWNGRADE:true}
       broadcast:
         enabled: ${WS_BROADCAST_NATS_ENABLED:false}
         url: ${NATS_URL:nats://localhost:4222}

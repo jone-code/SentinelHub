@@ -28,6 +28,8 @@ SentinelHub 审计与客户端事件冷存储使用 ClickHouse。Phase 10 起新
 
 迁移期间表短暂不可用（RENAME 瞬间）。建议在低峰期执行。
 
+**Phase 14+**：`POST .../clickhouse-migration/run` 在后台线程执行并立即返回；可通过 GET 轮询进度。
+
 ## API
 
 | 方法 | 路径 | 说明 |

@@ -23,6 +23,10 @@ public class TenantPlanService {
         return out;
     }
 
+    public TenantPlanTier resolveTierPublic(String code) {
+        return resolveTier(code);
+    }
+
     private static TenantPlanTier resolveTier(String code) {
         if (code == null || code.isBlank()) {
             throw new IllegalArgumentException("plan_tier is required");

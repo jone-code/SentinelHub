@@ -51,35 +51,45 @@ public class ClickHouseSchemaMigrationService {
         return status.snapshot();
     }
 
+    public boolean isRunning() {
+        return status.isRunning();
+    }
+
     public void migrateToReplacingMergeTreeIfNeeded() {
         if (!properties.enabled() || !properties.replacingMergeMigrateOnStartup()) {
             status.idle("migration not scheduled on startup");
-            return;
         }
-        runMigration("startup");
     }
 
-    public synchronized void runMigration(String trigger) {
+    public synchronized void prepareAsyncRun(String trigger) {
         if (!properties.enabled()) {
             status.skip("ClickHouse disabled");
-            return;
+            throw new IllegalStateException("ClickHouse disabled");
         }
         if (!properties.replacingMerge()) {
             status.skip("replacing-merge is false");
-            return;
+            throw new IllegalStateException("replacing-merge is false");
         }
         if (status.isRunning()) {
             throw new IllegalStateException("migration already running");
         }
         status.reset("trigger=" + trigger);
+    }
+
+    public void runMigrationBody(String trigger) {
         try {
             migrateTable(AUDIT_LOGS);
             migrateTable(CLIENT_EVENTS);
             status.complete("migration finished");
         } catch (Exception e) {
             status.fail(e.getMessage());
-            throw new IllegalStateException("ClickHouse ReplacingMergeTree migration failed", e);
+            log.error("ClickHouse migration failed (trigger={}): {}", trigger, e.getMessage());
         }
+    }
+
+    public synchronized void runMigration(String trigger) {
+        prepareAsyncRun(trigger);
+        runMigrationBody(trigger);
     }
 
     private void migrateTable(String table) throws Exception {

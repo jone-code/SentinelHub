@@ -1,5 +1,6 @@
 package com.sentinelhub.config;
 
+import com.sentinelhub.clickhouse.ClickHouseMigrationTaskService;
 import com.sentinelhub.clickhouse.ClickHouseSchemaMigrationService;
 import com.sentinelhub.module.audit.ClickHouseAuditRepository;
 import com.sentinelhub.module.software.ClickHouseClientEventRepository;
@@ -18,15 +19,18 @@ public class ClickHouseInitializer implements ApplicationRunner {
     private final ClickHouseAuditRepository clickHouseAuditRepository;
     private final ClickHouseClientEventRepository clickHouseClientEventRepository;
     private final ClickHouseSchemaMigrationService migrationService;
+    private final ClickHouseMigrationTaskService migrationTaskService;
 
     public ClickHouseInitializer(AuditClickHouseProperties properties,
                                  ClickHouseAuditRepository clickHouseAuditRepository,
                                  ClickHouseClientEventRepository clickHouseClientEventRepository,
-                                 ClickHouseSchemaMigrationService migrationService) {
+                                 ClickHouseSchemaMigrationService migrationService,
+                                 ClickHouseMigrationTaskService migrationTaskService) {
         this.properties = properties;
         this.clickHouseAuditRepository = clickHouseAuditRepository;
         this.clickHouseClientEventRepository = clickHouseClientEventRepository;
         this.migrationService = migrationService;
+        this.migrationTaskService = migrationTaskService;
     }
 
     @Override
@@ -36,7 +40,11 @@ public class ClickHouseInitializer implements ApplicationRunner {
         }
         clickHouseAuditRepository.ensureSchema();
         clickHouseClientEventRepository.ensureSchema();
-        migrationService.migrateToReplacingMergeTreeIfNeeded();
+        if (properties.replacingMergeMigrateOnStartup()) {
+            migrationTaskService.submitQuietly("startup");
+        } else {
+            migrationService.migrateToReplacingMergeTreeIfNeeded();
+        }
         log.info("ClickHouse cold storage enabled ({}) — audit_logs + client_events", properties.url());
     }
 }
