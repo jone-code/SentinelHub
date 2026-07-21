@@ -34,6 +34,7 @@ public class ClickHouseSchemaMigrationService {
     private final AuditClickHouseProperties properties;
     private final ObjectMapper objectMapper;
     private final ClickHouseMigrationCheckpointRepository checkpointRepository;
+    private final ClickHouseMigrationLockService lockService;
     private final ClickHouseMigrationStatus status = new ClickHouseMigrationStatus();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3))
@@ -41,10 +42,12 @@ public class ClickHouseSchemaMigrationService {
 
     public ClickHouseSchemaMigrationService(AuditClickHouseProperties properties,
                                             ObjectMapper objectMapper,
-                                            ClickHouseMigrationCheckpointRepository checkpointRepository) {
+                                            ClickHouseMigrationCheckpointRepository checkpointRepository,
+                                            ClickHouseMigrationLockService lockService) {
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.checkpointRepository = checkpointRepository;
+        this.lockService = lockService;
     }
 
     public Map<String, Object> snapshot() {
@@ -149,6 +152,7 @@ public class ClickHouseSchemaMigrationService {
         checkpointRepository.upsert(table, offset, totalRows, "copy_data");
 
         while (offset < totalRows) {
+            lockService.renew();
             updateProgress(table, engine, ClickHouseMigrationStatus.TableStatus.RUNNING,
                     "copy_data", "copying rows " + offset + "/" + totalRows, offset, totalRows, started);
             String copySql = "INSERT INTO " + db + "." + newTable

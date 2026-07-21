@@ -14,20 +14,26 @@ public class TenantPlanChangeService {
 
     private final TenantPlanRepository tenantPlanRepository;
     private final TenantPlanChangeRequestRepository requestRepository;
+    private final PlanChangeApprovalRepository approvalRepository;
     private final TenantPlanService tenantPlanService;
     private final PlanBillingProperties billingProperties;
     private final PlanApprovalProperties approvalProperties;
+    private final BillingWebhookClient billingWebhookClient;
 
     public TenantPlanChangeService(TenantPlanRepository tenantPlanRepository,
                                    TenantPlanChangeRequestRepository requestRepository,
+                                   PlanChangeApprovalRepository approvalRepository,
                                    TenantPlanService tenantPlanService,
                                    PlanBillingProperties billingProperties,
-                                   PlanApprovalProperties approvalProperties) {
+                                   PlanApprovalProperties approvalProperties,
+                                   BillingWebhookClient billingWebhookClient) {
         this.tenantPlanRepository = tenantPlanRepository;
         this.requestRepository = requestRepository;
+        this.approvalRepository = approvalRepository;
         this.tenantPlanService = tenantPlanService;
         this.billingProperties = billingProperties;
         this.approvalProperties = approvalProperties;
+        this.billingWebhookClient = billingWebhookClient;
     }
 
     public Map<String, Object> submitRequest(String tenantId, String userId, String toTierCode) {
@@ -50,15 +56,7 @@ public class TenantPlanChangeService {
                 && (!downgrade || !approvalProperties.autoApproveDowngrade());
 
         if (!needsApproval) {
-            tenantPlanService.updatePlanTier(tenantId, toTier.code());
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("status", "applied");
-            out.put("plan_tier", toTier.code());
-            out.put("message", "plan tier updated immediately");
-            out.put("monthly_price_cents", priceCents);
-            out.put("currency", billingProperties.currency());
-            out.put("billing_note", billingNote);
-            return out;
+            return applyImmediately(tenantId, toTier, priceCents, billingNote, null);
         }
 
         String requestId = requestRepository.insert(
@@ -72,6 +70,8 @@ public class TenantPlanChangeService {
         out.put("monthly_price_cents", priceCents);
         out.put("currency", billingProperties.currency());
         out.put("billing_note", billingNote);
+        out.put("required_approvals", approvalProperties.requiredApprovals());
+        out.put("approval_count", 0);
         out.put("message", "plan change submitted for approval");
         return out;
     }
@@ -90,12 +90,41 @@ public class TenantPlanChangeService {
         if (!"pending".equals(req.status())) {
             throw new IllegalStateException("request is not pending");
         }
+        if (reviewerId.equals(req.requestedBy())) {
+            throw new IllegalArgumentException("requester cannot approve own request");
+        }
+        if (approvalRepository.hasApproved(requestId, reviewerId)) {
+            throw new IllegalStateException("already approved by this reviewer");
+        }
+
+        approvalRepository.addApproval(requestId, reviewerId);
+        int approvalCount = approvalRepository.countApprovals(requestId);
+        int required = approvalProperties.requiredApprovals();
+
+        if (approvalCount < required) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("status", "pending");
+            out.put("request_id", requestId);
+            out.put("approval_count", approvalCount);
+            out.put("required_approvals", required);
+            out.put("approvers", approvalRepository.listReviewers(requestId));
+            out.put("message", "approval recorded, awaiting more reviewers");
+            return out;
+        }
+
         requestRepository.approve(tenantId, requestId, reviewerId, reviewNote);
         tenantPlanService.updatePlanTier(tenantId, req.toTier());
+        billingWebhookClient.notifyPlanChangeApplied(
+                tenantId, requestId, req.fromTier(), req.toTier(),
+                req.monthlyPriceCents(), req.currency()
+        ).ifPresent(extId -> requestRepository.setBillingExternalId(tenantId, requestId, extId));
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("status", "approved");
         out.put("plan_tier", req.toTier());
         out.put("request_id", requestId);
+        out.put("approval_count", approvalCount);
+        out.put("required_approvals", required);
         out.put("message", "plan change approved and applied");
         return out;
     }
@@ -111,6 +140,22 @@ public class TenantPlanChangeService {
         out.put("status", "rejected");
         out.put("request_id", requestId);
         out.put("message", "plan change rejected");
+        return out;
+    }
+
+    private Map<String, Object> applyImmediately(String tenantId, TenantPlanTier toTier,
+                                                  int priceCents, String billingNote, String requestId) {
+        tenantPlanService.updatePlanTier(tenantId, toTier.code());
+        billingWebhookClient.notifyPlanChangeApplied(
+                tenantId, requestId != null ? requestId : "immediate", "n/a", toTier.code(),
+                priceCents, billingProperties.currency());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("status", "applied");
+        out.put("plan_tier", toTier.code());
+        out.put("message", "plan tier updated immediately");
+        out.put("monthly_price_cents", priceCents);
+        out.put("currency", billingProperties.currency());
+        out.put("billing_note", billingNote);
         return out;
     }
 
@@ -134,7 +179,7 @@ public class TenantPlanChangeService {
         };
     }
 
-    private static Map<String, Object> toMap(TenantPlanChangeRequestRepository.PlanChangeRequest req) {
+    private Map<String, Object> toMap(TenantPlanChangeRequestRepository.PlanChangeRequest req) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", req.id());
         m.put("from_tier", req.fromTier());
@@ -143,11 +188,17 @@ public class TenantPlanChangeService {
         m.put("monthly_price_cents", req.monthlyPriceCents());
         m.put("currency", req.currency());
         m.put("billing_note", req.billingNote());
+        m.put("billing_external_id", req.billingExternalId());
         m.put("review_note", req.reviewNote());
         m.put("requested_by", req.requestedBy());
         m.put("reviewed_by", req.reviewedBy());
         m.put("created_at", req.createdAt().toString());
         m.put("reviewed_at", req.reviewedAt() != null ? req.reviewedAt().toString() : null);
+        if ("pending".equals(req.status())) {
+            m.put("approval_count", approvalRepository.countApprovals(req.id()));
+            m.put("required_approvals", approvalProperties.requiredApprovals());
+            m.put("approvers", approvalRepository.listReviewers(req.id()));
+        }
         return m;
     }
 }

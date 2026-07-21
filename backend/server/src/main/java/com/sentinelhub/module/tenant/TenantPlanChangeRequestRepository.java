@@ -23,6 +23,7 @@ public class TenantPlanChangeRequestRepository {
             int monthlyPriceCents,
             String currency,
             String billingNote,
+            String billingExternalId,
             String reviewedBy,
             String reviewNote,
             Instant createdAt,
@@ -40,6 +41,7 @@ public class TenantPlanChangeRequestRepository {
             rs.getInt("monthly_price_cents"),
             rs.getString("currency"),
             rs.getString("billing_note"),
+            rs.getString("billing_external_id"),
             rs.getString("reviewed_by"),
             rs.getString("review_note"),
             rs.getTimestamp("created_at").toInstant(),
@@ -94,6 +96,12 @@ public class TenantPlanChangeRequestRepository {
                 "UPDATE tenant_plan_change_requests SET status = 'approved', reviewed_by = ?, "
                         + "review_note = ?, reviewed_at = ? WHERE tenant_id = ? AND id = ? AND status = 'pending'",
                 reviewedBy, reviewNote, Timestamp.from(Instant.now()), tenantId, id);
+    }
+
+    public void setBillingExternalId(String tenantId, String id, String externalId) {
+        jdbc.update(
+                "UPDATE tenant_plan_change_requests SET billing_external_id = ? WHERE tenant_id = ? AND id = ?",
+                externalId, tenantId, id);
     }
 
     public void reject(String tenantId, String id, String reviewedBy, String reviewNote) {
