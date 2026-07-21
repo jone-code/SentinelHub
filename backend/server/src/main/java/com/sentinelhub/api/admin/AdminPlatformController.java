@@ -9,8 +9,8 @@ import com.sentinelhub.common.tenant.TenantContext;
 import com.sentinelhub.module.audit.NatsConsumerMetrics;
 import com.sentinelhub.module.software.AdminWebSocketSessionRegistry;
 import com.sentinelhub.module.software.WebSocketPlanQuotaService;
+import com.sentinelhub.module.platform.PrometheusMetricsService;
 import com.sentinelhub.module.tenant.TenantPlanChangeService;
-import com.sentinelhub.module.tenant.TenantPlanService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,23 +33,23 @@ public class AdminPlatformController {
     private final ClickHouseSchemaMigrationService clickHouseMigrationService;
     private final ClickHouseMigrationTaskService clickHouseMigrationTaskService;
     private final WebSocketPlanQuotaService webSocketPlanQuotaService;
-    private final TenantPlanService tenantPlanService;
     private final TenantPlanChangeService tenantPlanChangeService;
+    private final PrometheusMetricsService prometheusMetricsService;
 
     public AdminPlatformController(NatsConsumerMetrics natsConsumerMetrics,
                                    AdminWebSocketSessionRegistry webSocketSessionRegistry,
                                    ClickHouseSchemaMigrationService clickHouseMigrationService,
                                    ClickHouseMigrationTaskService clickHouseMigrationTaskService,
                                    WebSocketPlanQuotaService webSocketPlanQuotaService,
-                                   TenantPlanService tenantPlanService,
-                                   TenantPlanChangeService tenantPlanChangeService) {
+                                   TenantPlanChangeService tenantPlanChangeService,
+                                   PrometheusMetricsService prometheusMetricsService) {
         this.natsConsumerMetrics = natsConsumerMetrics;
         this.webSocketSessionRegistry = webSocketSessionRegistry;
         this.clickHouseMigrationService = clickHouseMigrationService;
         this.clickHouseMigrationTaskService = clickHouseMigrationTaskService;
         this.webSocketPlanQuotaService = webSocketPlanQuotaService;
-        this.tenantPlanService = tenantPlanService;
         this.tenantPlanChangeService = tenantPlanChangeService;
+        this.prometheusMetricsService = prometheusMetricsService;
     }
 
     @GetMapping("/nats-metrics")
@@ -115,7 +115,9 @@ public class AdminPlatformController {
         TenantContext ctx = requireTenant();
         String note = request != null ? request.reviewNote() : null;
         Map<String, Object> result = tenantPlanChangeService.approve(ctx.tenantId(), ctx.userId(), id, note);
-        result.putAll(webSocketPlanQuotaService.quotaSnapshot(ctx.tenantId()));
+        if ("approved".equals(result.get("status"))) {
+            result.putAll(webSocketPlanQuotaService.quotaSnapshot(ctx.tenantId()));
+        }
         return ApiResponse.ok(result);
     }
 
@@ -140,6 +142,14 @@ public class AdminPlatformController {
             result.putAll(webSocketPlanQuotaService.quotaSnapshot(ctx.tenantId()));
         }
         return ApiResponse.ok(result);
+    }
+
+    @GetMapping("/prometheus-metrics")
+    public ApiResponse<Map<String, Object>> prometheusMetrics() {
+        requireTenant();
+        Map<String, Object> out = new LinkedHashMap<>(prometheusMetricsService.snapshot());
+        out.put("chart_point", prometheusMetricsService.chartPoint());
+        return ApiResponse.ok(out);
     }
 
     @GetMapping("/ws-plan-quota")

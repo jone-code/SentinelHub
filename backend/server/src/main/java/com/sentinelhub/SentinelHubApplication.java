@@ -7,6 +7,7 @@ import com.sentinelhub.config.TimelineProperties;
 import com.sentinelhub.config.TimelineSyncProperties;
 import com.sentinelhub.config.WebSocketBroadcastProperties;
 import com.sentinelhub.config.WebSocketLimitsProperties;
+import com.sentinelhub.config.BillingWebhookProperties;
 import com.sentinelhub.config.PlanApprovalProperties;
 import com.sentinelhub.config.PlanBillingProperties;
 import com.sentinelhub.config.WebSocketPlanQuotaProperties;
@@ -22,7 +23,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(scanBasePackages = "com.sentinelhub")
 @EnableScheduling
-@EnableConfigurationProperties({JwtProperties.class, SeedProperties.class, MinioProperties.class, AiLlmProperties.class, RemoteRtcProperties.class, AuditClickHouseProperties.class, AuditNatsProperties.class, ClientEventNatsProperties.class, TimelineProperties.class, TimelineSyncProperties.class, WebSocketBroadcastProperties.class, WebSocketLimitsProperties.class, WebSocketPlanQuotaProperties.class, PlanBillingProperties.class, PlanApprovalProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, SeedProperties.class, MinioProperties.class, AiLlmProperties.class, RemoteRtcProperties.class, AuditClickHouseProperties.class, AuditNatsProperties.class, ClientEventNatsProperties.class, TimelineProperties.class, TimelineSyncProperties.class, WebSocketBroadcastProperties.class, WebSocketLimitsProperties.class, WebSocketPlanQuotaProperties.class, PlanBillingProperties.class, PlanApprovalProperties.class, BillingWebhookProperties.class})
 public class SentinelHubApplication {
 
     public static void main(String[] args) {

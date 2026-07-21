@@ -10,7 +10,8 @@ public record AuditClickHouseProperties(
         boolean replacingMerge,
         boolean replacingMergeMigrateOnStartup,
         int migrationBatchSize,
-        boolean migrationResumeEnabled
+        boolean migrationResumeEnabled,
+        int migrationLockTtlSeconds
 ) {
     public AuditClickHouseProperties {
         if (url == null || url.isBlank()) {
@@ -21,6 +22,9 @@ public record AuditClickHouseProperties(
         }
         if (migrationBatchSize <= 0) {
             migrationBatchSize = 10000;
+        }
+        if (migrationLockTtlSeconds <= 0) {
+            migrationLockTtlSeconds = 300;
         }
     }
 }

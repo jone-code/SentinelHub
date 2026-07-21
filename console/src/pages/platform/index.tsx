@@ -38,7 +38,10 @@ interface PlanChangeRequest {
   monthly_price_cents: number;
   currency: string;
   billing_note: string;
-  review_note: string | null;
+  billing_external_id?: string | null;
+  approval_count?: number;
+  required_approvals?: number;
+  approvers?: string[];
   created_at: string;
 }
 
@@ -119,9 +122,11 @@ export default function Platform() {
         plan_tier: selectedTier,
       });
       const data = res.data.data;
-      if (data.status === 'applied') {
-        message.success('套餐已立即生效');
+      if (data.status === 'applied' || data.status === 'approved') {
+        message.success(data.status === 'applied' ? '套餐已立即生效' : '变更已批准并生效');
         loadQuota();
+      } else if (data.status === 'pending' && data.approval_count) {
+        message.success(`已记录审批 (${data.approval_count}/${data.required_approvals})`);
       } else {
         message.success('变更申请已提交，等待审批');
       }
@@ -135,9 +140,14 @@ export default function Platform() {
 
   const approve = async (id: string) => {
     try {
-      await api.post(`/platform/plan-tier/requests/${id}/approve`, {});
-      message.success('已批准并生效');
-      loadQuota();
+      const res = await api.post<ApiEnvelope<Record<string, unknown>>>(`/platform/plan-tier/requests/${id}/approve`, {});
+      const data = res.data.data;
+      if (data.status === 'approved') {
+        message.success('已批准并生效');
+        loadQuota();
+      } else {
+        message.success(`已记录审批 (${data.approval_count}/${data.required_approvals})`);
+      }
       loadRequests();
     } catch {
       message.error('批准失败');
@@ -255,6 +265,12 @@ export default function Platform() {
                 {
                   title: '月费',
                   render: (_, r) => formatPrice(r.monthly_price_cents, r.currency),
+                },
+                {
+                  title: '审批',
+                  render: (_, r) => r.status === 'pending' && r.required_approvals
+                    ? `${r.approval_count ?? 0}/${r.required_approvals}`
+                    : '-',
                 },
                 {
                   title: '状态',

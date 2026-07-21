@@ -243,8 +243,31 @@ docker compose up -d
 | `POST /api/admin/v1/platform/plan-tier/requests/{id}/approve` | 批准变更 |
 | `POST /api/admin/v1/platform/plan-tier/requests/{id}/reject` | 拒绝变更 |
 
+## 平台增强（phase 15）
+
+| 组件 | 能力 |
+|------|------|
+| 套餐 | 多管理员审批（`WS_PLAN_REQUIRED_APPROVALS`）+ 外部账单 Webhook |
+| ClickHouse | 多实例 MySQL 分布式锁（`clickhouse_migration_locks`） |
+| 管理台 | Prometheus 指标趋势图（recharts） |
+
+### 配置
+
+| 变量 | 说明 |
+|------|------|
+| `WS_PLAN_REQUIRED_APPROVALS` | 所需审批人数（默认 2） |
+| `WS_PLAN_BILLING_WEBHOOK_URL` | 套餐生效后外部账单回调 |
+| `SENTINEL_INSTANCE_ID` | 实例 ID（多副本锁标识） |
+| `AUDIT_CH_MIGRATION_LOCK_TTL` | 迁移锁租约秒数（默认 300） |
+
+### API
+
+| 路径 | 说明 |
+|------|------|
+| `GET /api/admin/v1/platform/prometheus-metrics` | Prometheus 指标快照 + 图表采样点 |
+
 ## 后续增强
 
-1. 套餐变更多管理员审批与外部账单系统对接
-2. ClickHouse 迁移多实例协调锁
-3. 管理台 Prometheus 图表嵌入
+1. 套餐变更 RBAC 角色权限与审批委托
+2. ClickHouse 迁移锁 Redis 后端（替代 MySQL）
+3. 管理台 Grafana iframe 嵌入
